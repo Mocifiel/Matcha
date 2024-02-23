@@ -17,6 +17,7 @@ import re
 import phonemizer
 import piper_phonemize
 from unidecode import unidecode
+from .numbers import normalize_numbers
 
 # To avoid excessive logging we set the log level of the phonemizer package to Critical
 critical_logger = logging.getLogger("phonemizer")
@@ -68,6 +69,8 @@ def expand_abbreviations(text):
         text = re.sub(regex, replacement, text)
     return text
 
+def expand_numbers(text):
+  return normalize_numbers(text)
 
 def lowercase(text):
     return text.lower()
@@ -114,3 +117,13 @@ def english_cleaners_piper(text):
     phonemes = "".join(piper_phonemize.phonemize_espeak(text=text, voice="en-US")[0])
     phonemes = collapse_whitespace(phonemes)
     return phonemes
+
+def english_cleaners(text):
+  '''Pipeline for English text, including number and abbreviation expansion.'''
+  text = convert_to_ascii(text)
+  text = lowercase(text)
+  text = expand_numbers(text)
+  text = expand_abbreviations(text)
+  text = collapse_whitespace(text)
+  text = text.replace('"', '')
+  return text

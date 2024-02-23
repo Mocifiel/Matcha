@@ -11,11 +11,21 @@ from matcha.utils.audio import mel_spectrogram
 from matcha.utils.model import fix_len_compatibility, normalize
 from matcha.utils.utils import intersperse
 
+from torchtts.data.datasets import TortoiseDataset as D
+from torchtts.data.core.datapipe_loader import DataPipeLoader
+
+import re
+
+
 
 def parse_filelist(filelist_path, split_char="|"):
     with open(filelist_path, encoding="utf-8") as f:
         filepaths_and_text = [line.strip().split(split_char) for line in f]
     return filepaths_and_text
+
+
+
+
 
 
 class TextMelDataModule(LightningDataModule):
@@ -229,3 +239,120 @@ class TextMelBatchCollate:
         spks = torch.tensor(spks, dtype=torch.long) if self.n_spks > 1 else None
 
         return {"x": x, "x_lengths": x_lengths, "y": y, "y_lengths": y_lengths, "spks": spks}
+
+class TextMelTorchTTSDataModule(LightningDataModule):
+    def __init__(  # pylint: disable=unused-argument
+        self,
+        raw_data,
+        data_dir,
+        shard_format,
+        shard_masks,
+        shard_name,
+        split,
+        shard_size,
+        n_workers,
+        pin_memory,
+        dynamic_batch,
+        batch_size,
+        num_samples,
+        vocab_path,
+        with_stat_data,
+        with_text_data,
+        with_context_info,
+        sample_rate,
+        lazy_decode,
+        conditioning_length,
+        max_text_tokens,
+        max_audio_length,
+    ):
+        super().__init__()
+
+        # this line allows to access init params with 'self.hparams' attribute
+        # also ensures init params will be stored in ckpt
+        self.save_hyperparameters(logger=False)
+    
+    def setup(self, stage: Optional[str] = None):  # pylint: disable=unused-argument
+        """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
+
+        This method is called by lightning with both `trainer.fit()` and `trainer.test()`, so be
+        careful not to execute things like random split twice!
+        """
+        # load and split datasets only if not loaded already
+        dataset = D(**self.hparams)
+        dataset.prepare_dataset()
+        self.dataset = dataset.as_data_pipeline()[self.hparams.split]
+
+    def train_dataloader(self):
+        return DataPipeLoader(
+            dataset=self.dataset, 
+            num_workers=self.hparams.n_workers, 
+            pin_memory=self.hparams.pin_memory)
+    
+
+
+
+if __name__ == '__main__':
+
+    data_module = TextMelDataModule(
+        name='ljspeech',
+        train_filelist_path='/data/chong/Matcha-TTS/data/filelists/ljs_audio_text_train_filelist.txt',
+        valid_filelist_path = '/data/chong/Matcha-TTS/data/filelists/ljs_audio_text_val_filelist.txt',
+        batch_size= 32,
+        num_workers=20,
+        pin_memory=True,
+        cleaners=['english_cleaners2'],
+        add_blank=True,
+        n_spks=1,
+        n_fft=1024,
+        n_feats=80,
+        sample_rate=22050,
+        hop_length=256,
+        win_length=1024,
+        f_min=0,
+        f_max=8000,
+        data_statistics={'mel_mean':-5.517436981201172,
+                            'mel_std': 2.0643768310546875},
+        seed=1234)
+    data_module.setup()
+    data_loader = data_module.train_dataloader()
+    for data in data_loader:
+        for key in data:
+            print(key)
+        print(data['x'].shape)
+        print(data['x'][0,:])
+        print(data['y'].shape)
+        print(data['spks'])
+        print(data['x_lengths'])
+        print(data['y_lengths'])
+        break
+
+    data_torchtts_module = TextMelTorchTTSDataModule(
+        raw_data='/data/yanzhen/LibriTTS',
+        data_dir='/data/chong/sydney',
+        shard_format='tar',
+        shard_masks='en-us_EnUSSydney_*.tar',
+        shard_name='shards',
+        split='train',
+        shard_size=2000,
+        n_workers=2,
+        pin_memory=True,
+        dynamic_batch=False,
+        batch_size=16,
+        num_samples=290000,
+        vocab_path='/data/chong/Matcha-TTS/bpe_lowercase_asr_256.json',
+        with_stat_data=True,
+        with_text_data=True,
+        with_context_info=True,
+        sample_rate=22050,
+        lazy_decode=True,
+        conditioning_length=102400,
+        max_text_tokens=400,
+        max_audio_length=441000
+    )
+    data_torchtts_module.setup()
+    for data in data_torchtts_module.train_dataloader():
+        for key in data:
+            print(f'{key} is {data[key].shape}')
+            print(data[key])
+        break
+    print('finish')
