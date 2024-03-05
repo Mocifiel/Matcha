@@ -1,0 +1,14 @@
+# ignore all files(start with .)
+.*
+
+# python
+__pycache__
+*.pyc
+
+docker
+figure
+jobs
+tools
+utils
+*.md
+train.py

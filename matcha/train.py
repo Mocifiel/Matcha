@@ -119,4 +119,6 @@ def main(cfg: DictConfig) -> Optional[float]:
 
 
 if __name__ == "__main__":
+    # Only for singularity training
+    
     main()  # pylint: disable=no-value-for-parameter

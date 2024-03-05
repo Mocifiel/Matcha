@@ -14,6 +14,7 @@ from matcha.utils.utils import intersperse
 from torchtts.data.datasets import TortoiseDataset as D
 from torchtts.data.core.datapipe_loader import DataPipeLoader
 
+
 import re
 
 
@@ -23,7 +24,29 @@ def parse_filelist(filelist_path, split_char="|"):
         filepaths_and_text = [line.strip().split(split_char) for line in f]
     return filepaths_and_text
 
+def compute_data_statistics(data_loader: torch.utils.data.DataLoader, out_channels: int):
+    """Generate data mean and standard deviation helpful in data normalisation
 
+    Args:
+        data_loader (torch.utils.data.Dataloader): _description_
+        out_channels (int): mel spectrogram channels
+    """
+    total_mel_sum = 0
+    total_mel_sq_sum = 0
+    total_mel_len = 0
+
+    for batch in data_loader:
+        mels = batch["y"]
+        mel_lengths = batch["y_lengths"]
+
+        total_mel_len += torch.sum(mel_lengths)
+        total_mel_sum += torch.sum(mels)
+        total_mel_sq_sum += torch.sum(torch.pow(mels, 2))
+
+    data_mean = total_mel_sum / (total_mel_len * out_channels)
+    data_std = torch.sqrt((total_mel_sq_sum / (total_mel_len * out_channels)) - torch.pow(data_mean, 2))
+
+    return {"mel_mean": data_mean.item(), "mel_std": data_std.item()}
 
 
 
@@ -243,6 +266,7 @@ class TextMelBatchCollate:
 class TextMelTorchTTSDataModule(LightningDataModule):
     def __init__(  # pylint: disable=unused-argument
         self,
+        name,
         raw_data,
         data_dir,
         shard_format,
@@ -264,6 +288,8 @@ class TextMelTorchTTSDataModule(LightningDataModule):
         conditioning_length,
         max_text_tokens,
         max_audio_length,
+        n_spks,
+        data_statistics,
     ):
         super().__init__()
 
@@ -327,6 +353,7 @@ if __name__ == '__main__':
         break
 
     data_torchtts_module = TextMelTorchTTSDataModule(
+        name='sydney',
         raw_data='/data/yanzhen/LibriTTS',
         data_dir='/data/chong/sydney',
         shard_format='tar',
@@ -347,12 +374,18 @@ if __name__ == '__main__':
         lazy_decode=True,
         conditioning_length=102400,
         max_text_tokens=400,
-        max_audio_length=441000
+        max_audio_length=441000,
+        n_spks=1,
+        data_statistics={'mel_mean':0.06798957288265228,
+                            'mel_std': 1.9658503532409668},
     )
     data_torchtts_module.setup()
-    for data in data_torchtts_module.train_dataloader():
-        for key in data:
-            print(f'{key} is {data[key].shape}')
-            print(data[key])
-        break
+    # for data in data_torchtts_module.train_dataloader():
+    #     for key in data:
+    #         print(f'{key} is {data[key].shape}')
+    #         print(data[key])
+    #     break
+    data_loader = data_torchtts_module.train_dataloader()
+    stats = compute_data_statistics(data_loader,80)
+    print(f'mean={stats["mel_mean"]},std={stats["mel_std"]}')
     print('finish')

@@ -424,6 +424,14 @@ class Decoder(nn.Module):
 
         for resnet, transformer_blocks, upsample in self.up_blocks:
             mask_up = masks.pop()
+            # debugging
+            # print('decoder.py')
+            # print(f'x.shape={x.shape}')
+            # print(f'hiddens[-1].shape={hiddens[-1].shape}')
+            # print(f'pack.shape={pack([x, hiddens[-1]], "b * t")[0].shape}')
+            # print(f'mask_up.shape={mask_up.shape}')
+            # print(f't.shape={t.shape}')
+
             x = resnet(pack([x, hiddens.pop()], "b * t")[0], mask_up, t)
             x = rearrange(x, "b c t -> b t c")
             mask_up = rearrange(mask_up, "b 1 t -> b t")
