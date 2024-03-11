@@ -62,9 +62,13 @@ def process_text(i: int, text: str, device: torch.device):
 def get_texts(args):
     if args.text:
         texts = [args.text]
-    else:
+    elif args.file:
         with open(args.file, encoding="utf-8") as f:
             texts = f.readlines()
+    elif args.phone_file:
+        original = np.loadtxt(args.phone_file, dtype=int)
+        texts = np.zeros(2*len(original),dtype=int)
+        texts[1::2] = original
     return texts
 
 
@@ -133,7 +137,7 @@ def save_to_folder(filename: str, output: dict, folder: str):
 
 def validate_args(args):
     assert (
-        args.text or args.file
+        args.text or args.file or args.phone_file
     ), "Either text or file must be provided Matcha-T(ea)TTS need sometext to whisk the waveforms."
     assert args.temperature >= 0, "Sampling temperature cannot be negative"
     assert args.steps > 0, "Number of ODE steps must be greater than 0"
@@ -264,6 +268,7 @@ def cli():
     parser.add_argument(
         "--batch_size", type=int, default=32, help="Batch size only useful when --batched (default: 32)"
     )
+    parser.add_argument("--phone_file", type=str, default=None, help="Phone file to synthesize")
 
     args = parser.parse_args()
 
@@ -284,7 +289,10 @@ def cli():
 
     spk = torch.tensor([args.spk], device=device, dtype=torch.long) if args.spk is not None else None
     if len(texts) == 1 or not args.batched:
-        unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk)
+        if args.phone_file:
+            unbatched_synthesis_phone(args, device, model, vocoder, denoiser, texts, spk)
+        else:
+            unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk)
     else:
         batched_synthesis(args, device, model, vocoder, denoiser, texts, spk)
 
@@ -387,6 +395,45 @@ def unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk):
 
         location = save_to_folder(base_name, output, args.output_folder)
         print(f"[+] Waveform saved: {location}")
+
+    print("".join(["="] * 100))
+    print(f"[🍵] Average Matcha-TTS RTF: {np.mean(total_rtf):.4f} ± {np.std(total_rtf)}")
+    print(f"[🍵] Average Matcha-TTS + VOCODER RTF: {np.mean(total_rtf_w):.4f} ± {np.std(total_rtf_w)}")
+    print("[🍵] Enjoy the freshly whisked 🍵 Matcha-TTS!")
+
+
+def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, spk):
+    total_rtf = []
+    total_rtf_w = []
+    base_name = f"utterance_{0:03d}"
+
+    print("".join(["="] * 100))
+    text_processed = {}
+    text_processed["x"] = torch.tensor(phones,device=device).unsqueeze(0)
+    text_processed["x_lengths"] = torch.tensor([text_processed["x"].shape[1]],device=device)
+    print(text_processed)
+
+    print(f"[🍵] Whisking Matcha-T(ea)TS for: {0}")
+    start_t = dt.datetime.now()
+    output = model.synthesise(
+        text_processed["x"],
+        text_processed["x_lengths"],
+        n_timesteps=args.steps,
+        temperature=args.temperature,
+        spks=spk,
+        length_scale=args.speaking_rate,
+    )
+    output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)
+    # RTF with HiFiGAN
+    t = (dt.datetime.now() - start_t).total_seconds()
+    rtf_w = t * 22050 / (output["waveform"].shape[-1])
+    print(f"[🍵-{0}] Matcha-TTS RTF: {output['rtf']:.4f}")
+    print(f"[🍵-{0}] Matcha-TTS + VOCODER RTF: {rtf_w:.4f}")
+    total_rtf.append(output["rtf"])
+    total_rtf_w.append(rtf_w)
+
+    location = save_to_folder(base_name, output, args.output_folder)
+    print(f"[+] Waveform saved: {location}")
 
     print("".join(["="] * 100))
     print(f"[🍵] Average Matcha-TTS RTF: {np.mean(total_rtf):.4f} ± {np.std(total_rtf)}")

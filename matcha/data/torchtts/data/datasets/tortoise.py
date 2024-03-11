@@ -203,7 +203,8 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _tokenize(data, tokenizer):
         text = data["text"]
-        phone_norm = text_to_sequence(text, ['english_cleaners2'])
+        # phone_norm = text_to_sequence(text, ['english_cleaners2'])
+        phone_norm = data["phone_id"]
         phone_norm = intersperse(phone_norm, 0)
         phone_norm = torch.IntTensor(phone_norm)
 
@@ -263,6 +264,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
         data["spks"] = None
         if data["y"].shape[-1] % 2 ==1:
             data["y"] = torch.nn.functional.pad(data["y"],(0,1))
+
 
         return data
 

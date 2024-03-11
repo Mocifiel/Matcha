@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
-
+import argparse
+import os
 import hydra
 import lightning as L
 import rootutils
@@ -9,7 +10,7 @@ from omegaconf import DictConfig
 
 from matcha import utils
 
-rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True)
+rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True) # commented when running on sing
 # ------------------------------------------------------------------------------------ #
 # the setup_root above is equivalent to:
 # - adding project root dir to PYTHONPATH
@@ -108,6 +109,7 @@ def main(cfg: DictConfig) -> Optional[float]:
     # (e.g. ask for tags if none are provided in cfg, print cfg tree, etc.)
     utils.extras(cfg)
 
+    os.makedirs(cfg.paths.log_dir,exist_ok=True)
     # train the model
     metric_dict, _ = train(cfg)
 
@@ -121,4 +123,5 @@ def main(cfg: DictConfig) -> Optional[float]:
 if __name__ == "__main__":
     # Only for singularity training
     
+
     main()  # pylint: disable=no-value-for-parameter

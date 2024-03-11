@@ -205,5 +205,6 @@ class BaseLightningClass(LightningModule, ABC):
                     dataformats="HWC",
                 )
 
-    def on_before_optimizer_step(self, optimizer):
+    # def on_before_optimizer_step(self, optimizer): #commented to solver the error on_before_optimizer_step() missing 1 required positional argument: 'opt_idx'
+    def on_before_optimizer_step(self,optimizer): 
         self.log_dict({f"grad_norm/{k}": v for k, v in grad_norm(self, norm_type=2).items()})
