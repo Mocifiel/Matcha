@@ -15,10 +15,10 @@ sla_tier="Premium"             # Basic, Standard or Premium
 distributed="false"            # enable distributed training or not
 
 project_name="matcha"    # project name (e.g., tacotron/fastspeech)
-exp_name="matcha-sydney-7"  # experimental name (e.g., Evan/Guy/Aria)
+exp_name="matcha-sydney-2"  # experimental name (e.g., Evan/Guy/Aria)
 
 # if the packages not installed in the docker, you can install them here
-extra_env_setup_cmd="pip uninstall torch -y; pip install --user torch==2.2.1 torchvision torchaudio; pip install --user ." # or extra_env_setup_cmd=""
+extra_env_setup_cmd="pip install torchvision==0.15.2 torchaudio==2.0.2;pip install --user ." # or extra_env_setup_cmd=""
 
 # ======================= parameters for running script =======================
 # All parameters are optional except "--distributed" which will be parsed by
@@ -37,13 +37,13 @@ python -u third_party/Submitter/utils/amlt_submit.py \
   --num-nodes ${num_nodes} --gpus-per-node ${gpus_per_node} \
   --memory-size ${memory_size} --gpu-type ${gpu_type} --sla-tier ${sla_tier} \
   --interconnect-type ${interconnect_type} --distributed ${distributed} \
-  --image-registry "azurecr.io" --image-repo "sramdevregistry" \
-  --key-vault-name "exawatt-philly-ipgsp" --docker-username "tts-itp-user" \
-  --image-name "pytorch:2.0.1-py39-cuda11.7-ubuntu20.04" \
+  --image-registry "azurecr.io" --image-repo "azurespeechdockers" \
+  --key-vault-name "exawatt-philly-ipgsp" --docker-username "default-pull" \
+  --image-name "pytorch:1.13.0-py38-cuda11.6-cudnn8-ubuntu20.04" \
   --data-container-name "philly-ipgsp" --model-container-name "philly-ipgsp" \
   --extra-env-setup-cmd "${extra_env_setup_cmd}" --local-code-dir "$(pwd)" \
   --amlt-project ${project_name} --exp-name ${exp_name} \
-  --run-cmd "python matcha/train.py data=sydney_sing run_name=sydney_1 model.n_vocab=7094 " \
+  --run-cmd "python matcha/train.py experiment=ljspeech " \
   --enable-cyber-eo "false" \
   --tool-type "Hydra"
 #  --extra-params "${extra_params}" 

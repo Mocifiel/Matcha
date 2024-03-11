@@ -215,8 +215,10 @@ def submit_job(args, no_prompts=False):
             if args.set_model_dir:
                 model_arg = "trainer.save_path"
         elif args.tool_type.lower() == "hydra":
-            model_dir = f"trainer.model_dir={amlt_model_dir}"
-            log_dir = f"trainer.log_dir={amlt_log_dir} hydra.run.dir=$$AMLT_CODE_DIR"
+            # model_dir = f"trainer.model_dir={amlt_model_dir}"
+            model_dir = f"paths.log_dir={amlt_model_dir}"
+            # log_dir = f"trainer.log_dir={amlt_log_dir} hydra.run.dir=$$AMLT_CODE_DIR"
+            log_dir = f'hhh'
             cyber_eo_config = f"trainer.model_registry_region={args.region}"
             if args.set_model_dir:
                 model_arg = "trainer.model_dir"
@@ -247,7 +249,8 @@ def submit_job(args, no_prompts=False):
         if model_arg and model_arg in args.extra_params:
             cmd += f" {log_dir}"
         else:
-            cmd += f" {model_dir} {log_dir}"
+            # cmd += f" {model_dir} {log_dir}"
+            cmd += f"{model_dir}"
 
         if args.enable_cyber_eo:
             cmd += f" {cyber_eo_config}"

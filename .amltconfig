@@ -1,0 +1,1 @@
+{"project_name": "matcha", "storage_account_name": "stdstoragetts01eus", "container_name": "philly-ipgsp", "blob_storage_account_name": "stdstoragetts01eus", "registry_name": "v-chongzhang", "local_path": "/home/chong/Matcha-TTS", "default_output_dir": "/home/chong/Matcha-TTS/amlt", "project_uuid": "7290424736.21102-af144e18-4d22-49d8-b4c1-052baf3f9918", "version": "9.20.1"}
