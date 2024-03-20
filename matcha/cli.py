@@ -119,7 +119,7 @@ def load_matcha(model_name, checkpoint_path, device):
 
 
 def to_waveform(mel, vocoder, denoiser=None):
-    audio = vocoder(mel).clamp(-1, 1)
+    audio = vocoder(mel).clamp(-2, 2)
     if denoiser is not None:
         audio = denoiser(audio.squeeze(), strength=0.00025).cpu().squeeze()
 
@@ -129,9 +129,9 @@ def to_waveform(mel, vocoder, denoiser=None):
 def save_to_folder(filename: str, output: dict, folder: str):
     folder = Path(folder)
     folder.mkdir(exist_ok=True, parents=True)
-    plot_spectrogram_to_numpy(np.array(output["mel"].squeeze().float().cpu()), f"{filename}.png")
+    # plot_spectrogram_to_numpy(np.array(output["mel"].squeeze().float().cpu()), f"{filename}.png")
     np.save(folder / f"{filename}", output["mel"].cpu().numpy())
-    sf.write(folder / f"{filename}.wav", output["waveform"], 22050, "PCM_24")
+    # sf.write(folder / f"{filename}.wav", output["waveform"], 22050, "PCM_24")
     return folder.resolve() / f"{filename}.wav"
 
 
@@ -423,21 +423,21 @@ def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, sp
         spks=spk,
         length_scale=args.speaking_rate,
     )
-    output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)
-    # RTF with HiFiGAN
-    t = (dt.datetime.now() - start_t).total_seconds()
-    rtf_w = t * 22050 / (output["waveform"].shape[-1])
-    print(f"[🍵-{0}] Matcha-TTS RTF: {output['rtf']:.4f}")
-    print(f"[🍵-{0}] Matcha-TTS + VOCODER RTF: {rtf_w:.4f}")
-    total_rtf.append(output["rtf"])
-    total_rtf_w.append(rtf_w)
+    # output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)
+    # # RTF with HiFiGAN
+    # t = (dt.datetime.now() - start_t).total_seconds()
+    # rtf_w = t * 22050 / (output["waveform"].shape[-1])
+    # print(f"[🍵-{0}] Matcha-TTS RTF: {output['rtf']:.4f}")
+    # print(f"[🍵-{0}] Matcha-TTS + VOCODER RTF: {rtf_w:.4f}")
+    # total_rtf.append(output["rtf"])
+    # total_rtf_w.append(rtf_w)
 
     location = save_to_folder(base_name, output, args.output_folder)
-    print(f"[+] Waveform saved: {location}")
+    # print(f"[+] Waveform saved: {location}")
 
     print("".join(["="] * 100))
-    print(f"[🍵] Average Matcha-TTS RTF: {np.mean(total_rtf):.4f} ± {np.std(total_rtf)}")
-    print(f"[🍵] Average Matcha-TTS + VOCODER RTF: {np.mean(total_rtf_w):.4f} ± {np.std(total_rtf_w)}")
+    # print(f"[🍵] Average Matcha-TTS RTF: {np.mean(total_rtf):.4f} ± {np.std(total_rtf)}")
+    # print(f"[🍵] Average Matcha-TTS + VOCODER RTF: {np.mean(total_rtf_w):.4f} ± {np.std(total_rtf_w)}")
     print("[🍵] Enjoy the freshly whisked 🍵 Matcha-TTS!")
 
 

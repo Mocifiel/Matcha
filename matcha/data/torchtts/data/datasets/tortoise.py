@@ -132,6 +132,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
         datapipe = datapipe.map(self._process_wav, fn_kwargs = {"conditioning_length": self.conditioning_length})
         datapipe = datapipe.map(self._tokenize, fn_kwargs={"tokenizer": self.tokenizer})
         datapipe = datapipe.filter(self._filter_unk_text)
+        datapipe = datapipe.filter(self._filter_unk_spks)
         datapipe = datapipe.filter(self._filter_long_sentence, fn_kwargs={"max_text_tokens": self._config.get("max_text_tokens", 400),
                                                                           "max_audio_length": self._config.get("max_audio_length", 600 / 22 * 22050)})
         datapipe = datapipe.map(self._rename_and_resize)
@@ -229,6 +230,13 @@ class TortoiseDataset(GeneratorBasedBuilder):
         return True
     
     @staticmethod
+    def _filter_unk_spks(data):
+        spks = data["speaker_id"].item()
+        if spks<359366 or spks>361791:
+            return False
+        return True
+    
+    @staticmethod
     def _filter_long_sentence(data, max_text_tokens, max_audio_length):
         text = data["text"]
         wav = data["wav"]
@@ -245,7 +253,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
         # data["conditioning_contains_self"]= 1
         data["y"] = data["mel"].T
         data["y_lengths"] = data["mel"].shape[0]
-        data["spks"] = data["speaker_id"]
+        data["spks"] = data["speaker_id"]-359366
 
 
         return data
@@ -261,7 +269,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
 
     @staticmethod
     def _modify_data_after_batch(data):
-        data["spks"] = None
+        # data["spks"] = None
         if data["y"].shape[-1] % 2 ==1:
             data["y"] = torch.nn.functional.pad(data["y"],(0,1))
 

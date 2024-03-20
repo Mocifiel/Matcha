@@ -2,6 +2,7 @@ import random
 from typing import Any, Dict, Optional
 
 import torch
+import numpy as np
 import torchaudio as ta
 from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
@@ -355,9 +356,11 @@ if __name__ == '__main__':
     data_torchtts_module = TextMelTorchTTSDataModule(
         name='sydney',
         raw_data='/data/yanzhen/LibriTTS',
-        data_dir='/data/chong/sydney',
+        # data_dir='/data/chong/sydney',
+        data_dir = '/data2/chong/libri',
         shard_format='tar',
-        shard_masks='en-us_EnUSSydney_*.tar',
+        # shard_masks='en-us_EnUSSydney_*.tar',
+        shard_masks='en-us_libriTTSR_*.tar',
         shard_name='shards',
         split='train',
         shard_size=2000,
@@ -383,13 +386,25 @@ if __name__ == '__main__':
     phone_min=10000
     phone_max=-10000
     i = 0
+    spks = []
     for data in data_torchtts_module.train_dataloader():
         
-        print(data['x'][0])
-        print(data['x_lengths'][0])
-        i +=1
-        if i==10:
-            break
+        # print(data['x'][0])
+        # print(data['x_lengths'][0])
+        # print(data['y'].shape)
+        print(data['spks'])
+        spks.append(data['spks'])
+    spks = torch.cat(spks,dim=-1)
+    print(spks.max())
+    print(spks.min())
+    spks = spks.tolist()
+    sorted_unique_spks = sorted(set(spks))
+    print(sorted_unique_spks)
+
+
+        # i +=1
+        # if i==2:
+            # break
     #     for key in data:
     #         print(f'{key} is {data[key].shape}')
     #         print(data[key])

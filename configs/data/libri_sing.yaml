@@ -1,0 +1,28 @@
+_target_: matcha.data.text_mel_datamodule.TextMelTorchTTSDataModule
+name: libritts
+raw_data: /data/yanzhen/LibriTTS # no use
+data_dir: /datablob/realisticttsdataset_v2.1/Training
+shard_format: tar
+shard_masks: en-us_libriTTSR_*.tar
+shard_name: shards
+split: train
+shard_size: 2000
+n_workers: 2
+pin_memory: True
+dynamic_batch: False
+batch_size: 32
+num_samples: 290000 # no use
+vocab_path: /datablob/v-chongzhang/bpe_lowercase_asr_256.json # no use in TextMelTorchTTSDataModule
+with_stat_data: True
+with_text_data: True
+with_context_info: True
+sample_rate: 22050
+lazy_decode: True
+conditioning_length: 102400
+max_text_tokens: 400
+max_audio_length: 441000
+n_spks: 2426
+data_statistics:
+  mel_mean: 0
+  mel_std: 1
+
