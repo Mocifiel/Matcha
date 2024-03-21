@@ -378,7 +378,7 @@ class Decoder(nn.Module):
             _type_: _description_
         """
 
-        t = self.time_embeddings(t)
+        t = self.time_embeddings(t) #(batch_size, in_channels)
         t = self.time_mlp(t)
 
         x = pack([x, mu], "b * t")[0]

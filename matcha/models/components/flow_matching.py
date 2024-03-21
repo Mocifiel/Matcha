@@ -118,7 +118,7 @@ class BASECFM(torch.nn.Module, ABC):
         # print(f't.shape={t.shape}')
         # print(f'u.shape={u.shape}')
 
-        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks), u, reduction="sum") / (
+        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond), u, reduction="sum") / (
             torch.sum(mask) * u.shape[1]
         )
         return loss, y

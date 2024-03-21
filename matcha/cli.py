@@ -405,7 +405,7 @@ def unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk):
 def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, spk):
     total_rtf = []
     total_rtf_w = []
-    base_name = f"utterance_{0:03d}"
+    base_name = f"utterance_{0:03d}_spk{spk}"
 
     print("".join(["="] * 100))
     text_processed = {}

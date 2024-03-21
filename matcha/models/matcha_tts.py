@@ -167,17 +167,19 @@ class MatchaTTS(BaseLightningClass):  # 🍵
                 Should be divisible by 2^{num of UNet downsamplings}. Needed to increase batch size.
             spks (torch.Tensor, optional): speaker ids.
                 shape: (batch_size,)
+            cond (torch.Tensor, optional): condition mel of the speaker.
+                shape: (batch_size, n_feats, cond_mel_length)
         """
         if self.n_spks > 1:
             # Get speaker embedding
-            spks = self.spk_emb(spks)
+            spks = self.spk_emb(spks) # (batch_size, spk_emb_dim)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
         y_max_length = y.shape[-1]
 
-        y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
-        attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2)
+        y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask) #(batch_size, 1, y_max_length)
+        attn_mask = x_mask.unsqueeze(-1) * y_mask.unsqueeze(2) #(batch, 1, max_text_length, y_max_length)
 
         # Use MAS to find most likely alignment `attn` between text and mel-spectrogram
         with torch.no_grad():

@@ -375,7 +375,7 @@ if __name__ == '__main__':
         with_context_info=True,
         sample_rate=22050,
         lazy_decode=True,
-        conditioning_length=102400,
+        conditioning_length=360,
         max_text_tokens=400,
         max_audio_length=441000,
         n_spks=1,
@@ -386,20 +386,26 @@ if __name__ == '__main__':
     phone_min=10000
     phone_max=-10000
     i = 0
-    spks = []
+    y_lengths = []
     for data in data_torchtts_module.train_dataloader():
         
         # print(data['x'][0])
-        # print(data['x_lengths'][0])
+        # print(data['x_lengths'])
+        # print(data['y_lengths'])
+        print(data.keys())
+        print(f'phone shape = {data["x"].shape}')
+        print(f'mel shape = {data["y"].shape}')
+        print(f'cond shape = {data["cond"].shape}')
         # print(data['y'].shape)
-        print(data['spks'])
-        spks.append(data['spks'])
-    spks = torch.cat(spks,dim=-1)
-    print(spks.max())
-    print(spks.min())
-    spks = spks.tolist()
-    sorted_unique_spks = sorted(set(spks))
-    print(sorted_unique_spks)
+        # print(data['spks'])
+        # y_lengths.append(data['y_lengths'])
+        # spks.append(data['spks'])
+    # spks = torch.cat(spks,dim=-1)
+    # print(spks.max())
+    # print(spks.min())
+    # spks = spks.tolist()
+    # sorted_unique_spks = sorted(set(spks))
+    # print(sorted_unique_spks)
 
 
         # i +=1
