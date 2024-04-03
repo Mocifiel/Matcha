@@ -60,7 +60,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
                                                         AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
                                                         AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
                                                         AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False))
-            self.uncond_emb = torch.nn.Parameter(torch.randn(1,80))
+            self.uncond_emb = torch.nn.Parameter(torch.randn(1,spk_emb_dim))
 
         self.encoder = TextEncoder(
             encoder.encoder_type,
@@ -83,7 +83,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         self.update_data_statistics(data_statistics)
 
     @torch.inference_mode()
-    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0):
+    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0,cfk=0.5):
         """
         Generates mel-spectrogram from text. Returns:
             1. encoder outputs
@@ -103,6 +103,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
                 shape: (batch_size, n_feats, cond_mel_length)
             length_scale (float, optional): controls speech pace.
                 Increase value to slow down generated speech and vice versa.
+            cfk (float, optional): classifier-free guidance
+                Increase value to increase the effect of condition
 
         Returns:
             dict: {
@@ -126,7 +128,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # Get speaker embedding
             # spks = self.spk_emb(spks.long())
             # Get cond embedding
-            spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
+            # spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
+            spks = self.cond_embedder(cond).mean(dim=-1)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
@@ -148,7 +151,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         encoder_outputs = mu_y[:, :, :y_max_length]
 
         # Generate sample tracing the probability flow
-        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, spks)
+        uncond_spks = self.uncond_emb.repeat(mu_y.shape[0],1) if cfk>0 else None#(batch_size, spk_emb_dim)
+        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, spks,uncond_spks=uncond_spks,cfk=cfk)
         decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         t = (dt.datetime.now() - t).total_seconds()
@@ -190,7 +194,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # Get speaker embedding
             # spks = self.spk_emb(spks) # (batch_size, spk_emb_dim)
             # Get cond embedding
-            spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
+            # spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
+            spks = self.cond_embedder(cond).mean(dim=-1) # (batch_size, spk_emb_dim)
 
         if self.unconditioned_percentage > 0:
             unconditioned_batches = torch.rand((x.shape[0],1),device=x.device)<self.unconditioned_percentage

@@ -271,7 +271,8 @@ def cli():
     )
     parser.add_argument("--phone_file", type=str, default=None, help="Phone file to synthesize")
     parser.add_argument("--cond_mel", type=str, default=None, help="Condition mel-spectrogram")
-
+    parser.add_argument("--cfk",type=float,default=0,help="Classifier-free guidance coefficient" )
+    parser.add_argument("--base_name",type=str,default='utterance',help="Name of output wav")
     args = parser.parse_args()
 
     args = validate_args(args)
@@ -292,7 +293,7 @@ def cli():
     spk = torch.tensor([args.spk], device=device, dtype=torch.long) if args.spk is not None else None
     if len(texts) == 1 or not args.batched:
         if args.phone_file:
-            unbatched_synthesis_phone(args, device, model, vocoder, denoiser, texts, spk)
+            unbatched_synthesis_phone(args, device, model, vocoder, denoiser, texts, spk,cfk=args.cfk)
         else:
             unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk)
     else:
@@ -415,10 +416,8 @@ def preprocess_cond_mel(mel,conditioning_length=360):
     return cond
 
 
-def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, spk):
-    total_rtf = []
-    total_rtf_w = []
-    base_name = f"utterance_{0:03d}_spk{spk.item()}"
+def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, spk, cfk=0.5):
+    base_name = args.base_name
 
     print("".join(["="] * 100))
     text_processed = {}
@@ -442,6 +441,7 @@ def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, sp
         spks=spk,
         cond = cond_mel,
         length_scale=args.speaking_rate,
+        cfk = cfk,
     )
     # output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)
     # # RTF with HiFiGAN
