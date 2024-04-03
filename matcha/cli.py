@@ -3,6 +3,7 @@ import datetime as dt
 import os
 import warnings
 from pathlib import Path
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -269,6 +270,7 @@ def cli():
         "--batch_size", type=int, default=32, help="Batch size only useful when --batched (default: 32)"
     )
     parser.add_argument("--phone_file", type=str, default=None, help="Phone file to synthesize")
+    parser.add_argument("--cond_mel", type=str, default=None, help="Condition mel-spectrogram")
 
     args = parser.parse_args()
 
@@ -401,17 +403,34 @@ def unbatched_synthesis(args, device, model, vocoder, denoiser, texts, spk):
     print(f"[🍵] Average Matcha-TTS + VOCODER RTF: {np.mean(total_rtf_w):.4f} ± {np.std(total_rtf_w)}")
     print("[🍵] Enjoy the freshly whisked 🍵 Matcha-TTS!")
 
+def preprocess_cond_mel(mel,conditioning_length=360):
+    mel=mel.T #(n_feas, mel_timesteps)
+    gap = mel.shape[-1] - conditioning_length
+    if gap>0:
+        rand_start = random.randint(0, gap)
+        cond = mel[:,rand_start:rand_start+conditioning_length]
+    else:
+        cond = torch.nn.functional.pad(mel,(0,-gap),'constant',value=0)
+    cond = cond.unsqueeze(0)
+    return cond
+
 
 def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, spk):
     total_rtf = []
     total_rtf_w = []
-    base_name = f"utterance_{0:03d}_spk{spk}"
+    base_name = f"utterance_{0:03d}_spk{spk.item()}"
 
     print("".join(["="] * 100))
     text_processed = {}
     text_processed["x"] = torch.tensor(phones,device=device).unsqueeze(0)
     text_processed["x_lengths"] = torch.tensor([text_processed["x"].shape[1]],device=device)
     print(text_processed)
+    if args.cond_mel is not None:
+        cond_mel = torch.tensor(np.load(args.cond_mel),device=device)
+        cond_mel = preprocess_cond_mel(cond_mel, conditioning_length=360)
+        spk = None
+    
+    print(cond_mel.shape)
 
     print(f"[🍵] Whisking Matcha-T(ea)TS for: {0}")
     start_t = dt.datetime.now()
@@ -421,6 +440,7 @@ def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, sp
         n_timesteps=args.steps,
         temperature=args.temperature,
         spks=spk,
+        cond = cond_mel,
         length_scale=args.speaking_rate,
     )
     # output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)

@@ -9,6 +9,8 @@ from diffusers.models.activations import get_activation
 from einops import pack, rearrange, repeat
 
 from matcha.models.components.transformer import BasicTransformerBlock
+from matcha.models.components.attention import AttentionBlock, normalization
+# from attention import AttentionBlock
 
 
 class SinusoidalPosEmb(torch.nn.Module):
@@ -212,6 +214,7 @@ class Decoder(nn.Module):
         down_block_type="transformer",
         mid_block_type="transformer",
         up_block_type="transformer",
+        use_cond = False
     ):
         super().__init__()
         channels = tuple(channels)
@@ -225,6 +228,21 @@ class Decoder(nn.Module):
             time_embed_dim=time_embed_dim,
             act_fn="silu",
         )
+        
+        if use_cond:
+            self.contextual_embedder = nn.Sequential(nn.Conv1d(in_channels//2,in_channels//2,3,padding=1,stride=2),
+                                                    nn.Conv1d(in_channels//2, in_channels,3,padding=1,stride=2),
+                                                    AttentionBlock(in_channels, num_heads, relative_pos_embeddings=True, do_checkpoint=False),
+                                                    AttentionBlock(in_channels, num_heads, relative_pos_embeddings=True, do_checkpoint=False),
+                                                    AttentionBlock(in_channels, num_heads, relative_pos_embeddings=True, do_checkpoint=False),
+                                                    AttentionBlock(in_channels, num_heads, relative_pos_embeddings=True, do_checkpoint=False),
+                                                    AttentionBlock(in_channels, num_heads, relative_pos_embeddings=True, do_checkpoint=False))
+            self.latent_conditioner = nn.Sequential(nn.Conv1d(in_channels//2, in_channels//2, 3, padding=1),
+                                                    AttentionBlock(in_channels//2, num_heads, relative_pos_embeddings=True),
+                                                    AttentionBlock(in_channels//2, num_heads, relative_pos_embeddings=True),
+                                                    AttentionBlock(in_channels//2, num_heads, relative_pos_embeddings=True),
+                                                    AttentionBlock(in_channels//2, num_heads, relative_pos_embeddings=True),)
+            self.cond_norm = normalization(in_channels//2)
 
         self.down_blocks = nn.ModuleList([])
         self.mid_blocks = nn.ModuleList([])
@@ -359,13 +377,32 @@ class Decoder(nn.Module):
 
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
+    
+    def timestep_independent(self, mu, cond):
+        """Compute conditions using mu and cond
+
+        Args:
+            mu (torch.Tensor): shape (batch_size, n_feats, mel_timesteps)
+            cond (torch.Tensor): shape (batch_size, n_feats, cond_mel_timesteps)
+
+        Raises:
+
+        Returns:
+            cond_emb (torch.Tensor): shape (batch_size, n_feats, mel_timesteps)
+        """
+        cond = self.contextual_embedder(cond) # (batch_size, 2*n_feats, cond_mel_timesteps)
+        cond_emb = cond.mean(dim=-1) #(batch_size, 2*n_feats)
+        cond_scale, cond_shift = torch.chunk(cond_emb, 2, dim=1) #(batch_size, n_feats) for each
+        cond_emb = self.latent_conditioner(mu) #(batch_size, n_feats, mel_timesteps)
+        cond_emb = self.cond_norm(cond_emb) * (1 + cond_scale.unsqueeze(-1)) + cond_shift.unsqueeze(-1) # (batch_size, n_feats, mel_timesteps)
+        return cond_emb
 
     def forward(self, x, mask, mu, t, spks=None, cond=None):
         """Forward pass of the UNet1DConditional model.
 
         Args:
-            x (torch.Tensor): shape (batch_size, in_channels, time)
-            mask (_type_): shape (batch_size, 1, time)
+            x (torch.Tensor): shape (batch_size, n_feats, mel_timesteps)
+            mask (_type_): shape (batch_size, 1, mel_timesteps)
             t (_type_): shape (batch_size)
             spks (_type_, optional): shape: (batch_size, condition_channels). Defaults to None.
             cond (_type_, optional): placeholder for future use. Defaults to None.
@@ -377,9 +414,13 @@ class Decoder(nn.Module):
         Returns:
             _type_: _description_
         """
+        assert not (spks is not None and cond is not None)  # These two are mutually exclusive.
 
         t = self.time_embeddings(t) #(batch_size, in_channels)
         t = self.time_mlp(t)
+        
+        if cond is not None:
+            mu = self.timestep_independent(mu,cond) #(batch_size, n_feats, mel_timesteps)
 
         x = pack([x, mu], "b * t")[0]
 

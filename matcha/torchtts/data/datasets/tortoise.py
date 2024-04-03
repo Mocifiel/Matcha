@@ -121,9 +121,9 @@ class TortoiseDataset(GeneratorBasedBuilder):
 
     def _data_pipeline(self, datapipe, shuffle=True):
         # On-the-fly context should be added before shuffle
-        self.load_condition = self._config.get("load_condition", False)
+        self.load_condition = self._config.get("load_condition", True)
         self.conditioning_candidates = self._config.get("conditioning_candidates", 1)
-        self.conditioning_length = self._config.get("conditioning_length", 44100)
+        self.conditioning_length = self._config.get("conditioning_length", 360)
         self.load_aligned_codes = self._config.get("load_aligned_codes", False)
         self.aligned_codes_to_audio_ratio = self._config.get("aligned_codes_ratio", 443)
 
@@ -164,7 +164,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
                 "padding_axes": {
                     "text": -1,
                     "wav": -1,
-                    "conditioning": -1,
+                    "cond": -1,
                     "phone_id":-1,
                     "y":-1,
                     "x":-1
@@ -172,7 +172,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
                 "padding_values": {
                     "text": 0, 
                     "wav": 0, 
-                    "conditioning": 0,
+                    "cond": 0,
                     "phone_id":0,
                     "y":0,
                     "x":0
@@ -185,18 +185,22 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _process_wav(data, conditioning_length):
         audio = data["speech"]
+        mel = data["mel"].T
         data["wav"] = np.expand_dims(audio,axis=0)
         data["wav_lengths"] = torch.LongTensor([len(audio)])
         #data["conditioning"] = np.expand_dims(audio, axis=0)
-        gap = audio.shape[-1] - conditioning_length
+        # gap = audio.shape[-1] - conditioning_length
+        gap = mel.shape[-1] - conditioning_length
         if gap>0:
             rand_start = random.randint(0, gap)
-            cond = audio[rand_start:rand_start+conditioning_length]
-            data["conditioning"] = cond
+            # cond = audio[rand_start:rand_start+conditioning_length]
+            cond = mel[:,rand_start:rand_start+conditioning_length]
+            data["cond"] = cond
         else:
-            data["conditioning"] = audio
+            # data["conditioning"] = audio
+            data["cond"] = mel
         
-        data["conditioning"] = np.expand_dims(data["conditioning"], axis=0)
+        # data["conditioning"] = np.expand_dims(data["conditioning"], axis=0)
 
 
         return data
@@ -261,7 +265,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _release_unnecessary_data(data):
         # necessary_keys = ["wav", "wav_lengths", "text", "text_lengths", "conditioning","skipped_items", "conditioning_contains_self"]
-        necessary_keys = ["x","x_lengths","y","y_lengths","spks"]
+        necessary_keys = ["x","x_lengths","y","y_lengths","spks","cond"]
         for key in list(data.keys()):
             if key not in necessary_keys:
                 del data[key]
@@ -272,7 +276,6 @@ class TortoiseDataset(GeneratorBasedBuilder):
         # data["spks"] = None
         if data["y"].shape[-1] % 2 ==1:
             data["y"] = torch.nn.functional.pad(data["y"],(0,1))
-
 
         return data
 

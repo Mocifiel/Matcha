@@ -9,6 +9,7 @@ from matcha import utils
 from matcha.models.baselightningmodule import BaseLightningClass
 from matcha.models.components.flow_matching import CFM
 from matcha.models.components.text_encoder import TextEncoder
+from matcha.models.components.attention import AttentionBlock, normalization
 from matcha.utils.model import (
     denormalize,
     duration_loss,
@@ -32,6 +33,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         cfm,
         data_statistics,
         out_size,
+        unconditioned_percentage=0,
         optimizer=None,
         scheduler=None,
         prior_loss=True,
@@ -46,9 +48,19 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         self.n_feats = n_feats
         self.out_size = out_size
         self.prior_loss = prior_loss
+        self.unconditioned_percentage = unconditioned_percentage
 
         if n_spks > 1:
-            self.spk_emb = torch.nn.Embedding(n_spks, spk_emb_dim)
+            # self.spk_emb = torch.nn.Embedding(n_spks, spk_emb_dim)
+        
+            self.cond_embedder = self.contextual_embedder = torch.nn.Sequential(torch.nn.Conv1d(80,spk_emb_dim,3,padding=1,stride=2),
+                                                        torch.nn.Conv1d(spk_emb_dim, spk_emb_dim,3,padding=1,stride=2),
+                                                        AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
+                                                        AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
+                                                        AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
+                                                        AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False),
+                                                        AttentionBlock(spk_emb_dim, num_heads=4, relative_pos_embeddings=True, do_checkpoint=False))
+            self.uncond_emb = torch.nn.Parameter(torch.randn(1,80))
 
         self.encoder = TextEncoder(
             encoder.encoder_type,
@@ -71,7 +83,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         self.update_data_statistics(data_statistics)
 
     @torch.inference_mode()
-    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, length_scale=1.0):
+    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0):
         """
         Generates mel-spectrogram from text. Returns:
             1. encoder outputs
@@ -87,6 +99,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             temperature (float, optional): controls variance of terminal distribution.
             spks (bool, optional): speaker ids.
                 shape: (batch_size,)
+            cond (torch.Tensor, optional): condition mel of the speaker.
+                shape: (batch_size, n_feats, cond_mel_length)
             length_scale (float, optional): controls speech pace.
                 Increase value to slow down generated speech and vice versa.
 
@@ -110,7 +124,9 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
         if self.n_spks > 1:
             # Get speaker embedding
-            spks = self.spk_emb(spks.long())
+            # spks = self.spk_emb(spks.long())
+            # Get cond embedding
+            spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
@@ -172,7 +188,13 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         """
         if self.n_spks > 1:
             # Get speaker embedding
-            spks = self.spk_emb(spks) # (batch_size, spk_emb_dim)
+            # spks = self.spk_emb(spks) # (batch_size, spk_emb_dim)
+            # Get cond embedding
+            spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
+
+        if self.unconditioned_percentage > 0:
+            unconditioned_batches = torch.rand((x.shape[0],1),device=x.device)<self.unconditioned_percentage
+            spks = torch.where(unconditioned_batches,self.uncond_emb.repeat(x.shape[0],1),spks) # (batch_size, spk_emb_dim)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
@@ -230,7 +252,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         mu_y = mu_y.transpose(1, 2)
 
         # Compute loss of the decoder
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks, cond=cond)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks,cond=None) # flow_matching.py:CFM
 
         if self.prior_loss:
             prior_loss = torch.sum(0.5 * ((y - mu_y) ** 2 + math.log(2 * math.pi)) * y_mask)
