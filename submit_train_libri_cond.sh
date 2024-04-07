@@ -5,17 +5,17 @@
 set -euo pipefail
 
 region="southcentralus"        # eastus, southcentralus, westus2
-cluster="spch-sing-ttsprod-sc"     # spch-sing-tts-sc, spch-sing-ttsprod-sc
+cluster="spch-sing-tts-sc"     # spch-sing-tts-sc, spch-sing-ttsprod-sc
 num_nodes=1                    # 1 GPU node
-gpus_per_node=1                # each node with 1 GPU
+gpus_per_node=4                # each node with 1 GPU
 memory_size=16                 # 16GB
 gpu_type="V100"                # V100 GPU
 interconnect_type="Empty"      # "Empty", "IB", "NvLink", "xGMI", "IB-xGMI", "NvLink-xGMI"
 sla_tier="Premium"             # Basic, Standard or Premium
-distributed="false"            # enable distributed training or not
+distributed="true"            # enable distributed training or not
 
 project_name="matcha"    # project name (e.g., tacotron/fastspeech)
-exp_name="matcha-libri-cond-8-mean"  # experimental name (e.g., Evan/Guy/Aria)
+exp_name="matcha-libri-cond-15-distrib"  # experimental name (e.g., Evan/Guy/Aria)
 
 # if the packages not installed in the docker, you can install them here
 extra_env_setup_cmd="pip uninstall torch -y; pip install --user torch==2.2.1 torchvision torchaudio; pip install --user ." # or extra_env_setup_cmd=""
@@ -43,7 +43,7 @@ python -u third_party/Submitter/utils/amlt_submit.py \
   --data-container-name "data" --model-container-name "philly-ipgsp" \
   --extra-env-setup-cmd "${extra_env_setup_cmd}" --local-code-dir "$(pwd)" \
   --amlt-project ${project_name} --exp-name ${exp_name} \
-  --run-cmd "python matcha/train.py data=libri_sing run_name=libri_1 model.n_vocab=7094 model.decoder.use_cond=False " \
+  --run-cmd "python matcha/train.py trainer=ddp trainer.devices=[0,1,2,3] data=libri_sing data.batch_size=32 run_name=libri_1 model.n_vocab=7094 model.decoder.use_cond=False " \
   --enable-cyber-eo "false" \
   --tool-type "Hydra"
 #  --extra-params "${extra_params}" 
