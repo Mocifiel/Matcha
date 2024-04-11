@@ -1,12 +1,12 @@
 defaults:
   - _self_
   - encoder: default.yaml
-  - decoder: default.yaml
+  - decoder: ip_adapter.yaml
   - cfm: default.yaml
   - optimizer: adam.yaml
 
 _target_: matcha.models.matcha_tts.MatchaTTS
-n_vocab: 178
+n_vocab: 7094
 n_spks: ${data.n_spks}
 spk_emb_dim: 64
 n_feats: 80

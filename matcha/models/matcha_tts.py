@@ -10,6 +10,8 @@ from matcha.models.baselightningmodule import BaseLightningClass
 from matcha.models.components.flow_matching import CFM
 from matcha.models.components.text_encoder import TextEncoder
 from matcha.models.components.attention import AttentionBlock, normalization
+from matcha.models.components.WavLM import WavLM, WavLMConfig
+from matcha.models.components.ecapa_tdnn import ECAPA_TDNN_SMALL
 from matcha.utils.model import (
     denormalize,
     duration_loss,
@@ -37,6 +39,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         optimizer=None,
         scheduler=None,
         prior_loss=True,
+        cond_wave=False,
     ):
         super().__init__()
 
@@ -79,6 +82,23 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             n_spks=n_spks,
             spk_emb_dim=spk_emb_dim,
         )
+        if cond_wave:
+            # WavLM init
+            # wavelm_checkpoint = torch.load('/data2/chong/wavelm/WavLM-Large.pt')
+            # self.wavelm_cfg = WavLMConfig(wavelm_checkpoint['cfg'])
+            # self.wavelm = WavLM(self.wavelm_cfg)
+            # self.wavelm.load_state_dict(wavelm_checkpoint['model'])
+            # self.wavelm.eval()
+            # self.wavelm.requires_grad_(False)
+            
+            self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
+            # state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
+            state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
+            self.wavelmmodel.load_state_dict(state_dict['model'],strict=False)
+            self.wavelmmodel.eval()
+            self.wavelmmodel.requires_grad_(False)
+        
+
 
         self.update_data_statistics(data_statistics)
 
@@ -166,8 +186,43 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             "mel_lengths": y_lengths,
             "rtf": rtf,
         }
+    
+    @torch.no_grad()
+    def wavlm_feature(self,cond_wav=None):
+        """
+        cond_wav (torch.Tensor, optional): conditioning wav.
+                shape: (batch_size, 1, wav_length)
+        """
+        
+        # extract the representation of each layer
+        if self.wavelm_cfg.normalize:
+            cond_wav = torch.nn.functional.layer_norm(cond_wav.squeeze() , (cond_wav.shape[-1],))
 
-    def forward(self, x, x_lengths, y, y_lengths, spks=None, out_size=None, cond=None):
+        rep, layer_results = self.wavelm.extract_features(cond_wav, output_layer=self.wavelm.cfg.encoder_layers, ret_layer_results=True)[0]
+        layer_reps = [x.transpose(0, 1) for x, _ in layer_results]
+        layer_reps = torch.stack(layer_reps,dim=-1).mean(dim=-1) #
+        return layer_reps
+
+    @torch.no_grad()
+    def wavlm_feature2(self,cond_wav=None):
+        """
+        cond_wav (torch.Tensor, optional): conditioning wav.
+                shape: (batch_size, 1, wav_length)
+        """
+
+        wavemb = self.wavelmmodel(cond_wav.squeeze(1), fix=True)
+        wavemb = wavemb.reshape(-1, 4, 64)
+
+        # wavemb = wavemb.reshape(-1, 2, 256)
+        # wavemb = wavemb.mean(1)
+        # wavemb = wavemb / torch.norm(wavemb, dim=1, keepdim=True)
+        # spkembnew = wavemb#.detach()
+
+
+
+        return wavemb
+
+    def forward(self, x, x_lengths, y, y_lengths, spks=None, out_size=None, cond=None, cond_wav=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotinic Alignment Search (MAS).
@@ -189,6 +244,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
                 shape: (batch_size,)
             cond (torch.Tensor, optional): condition mel of the speaker.
                 shape: (batch_size, n_feats, cond_mel_length)
+            cond_wav (torch.Tensor, optional): conditioning wav.
+                shape: (batch_size, 1, wav_length)
         """
         if self.n_spks > 1:
             # Get speaker embedding
@@ -257,7 +314,9 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         mu_y = mu_y.transpose(1, 2)
 
         # Compute loss of the decoder
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks,cond=None) # flow_matching.py:CFM
+        if cond_wav is not None:
+            cond_wav = self.wavlm_feature2(cond_wav)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks,cond=None,cond_wav=cond_wav) # flow_matching.py:CFM
 
         if self.prior_loss:
             prior_loss = torch.sum(0.5 * ((y - mu_y) ** 2 + math.log(2 * math.pi)) * y_mask)
@@ -266,3 +325,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             prior_loss = 0
 
         return dur_loss, prior_loss, diff_loss
+
+if __name__ == "__main__":
+    print("test")

@@ -22,6 +22,7 @@ from torchtts.utils.data_utils import get_bucket_scheme, lowercase_dict_keys
 # from data.audio.voice_tokenizer import VoiceBpeTokenizer
 import librosa 
 import torch
+import torchaudio
 
 from tokenizers import Tokenizer
 from tokenizers.models import BPE
@@ -165,6 +166,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
                     "text": -1,
                     "wav": -1,
                     "cond": -1,
+                    "cond_wav":-1,
                     "phone_id":-1,
                     "y":-1,
                     "x":-1
@@ -173,6 +175,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
                     "text": 0, 
                     "wav": 0, 
                     "cond": 0,
+                    "cond_wav":0,
                     "phone_id":0,
                     "y":0,
                     "x":0
@@ -199,6 +202,17 @@ class TortoiseDataset(GeneratorBasedBuilder):
         else:
             # data["conditioning"] = audio
             data["cond"] = mel
+
+        gap = data["wav"].shape[-1] - 88200 # duration is 4s
+        if gap>0:
+            rand_start = random.randint(0,gap)
+            cond_wav = data["wav"][:,rand_start:rand_start+88200]
+        else:
+            cond_wav = data["wav"]
+        cond_wav = librosa.resample(cond_wav, orig_sr=22050, target_sr=16000) # resample to 16khz
+        data["cond_wav"] = cond_wav
+        
+        # random sampling wav_cond and resample
         
         # data["conditioning"] = np.expand_dims(data["conditioning"], axis=0)
 
@@ -265,7 +279,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _release_unnecessary_data(data):
         # necessary_keys = ["wav", "wav_lengths", "text", "text_lengths", "conditioning","skipped_items", "conditioning_contains_self"]
-        necessary_keys = ["x","x_lengths","y","y_lengths","spks","cond"]
+        necessary_keys = ["x","x_lengths","y","y_lengths","spks","cond","cond_wav"]
         for key in list(data.keys()):
             if key not in necessary_keys:
                 del data[key]

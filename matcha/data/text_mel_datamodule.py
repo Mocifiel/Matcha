@@ -396,6 +396,8 @@ if __name__ == '__main__':
         print(f'phone shape = {data["x"].shape}')
         print(f'mel shape = {data["y"].shape}')
         print(f'cond shape = {data["cond"].shape}')
+        print(f'cond_wav shape = {data["cond_wav"].shape}')
+        break
         # print(data['y'].shape)
         # print(data['spks'])
         # y_lengths.append(data['y_lengths'])

@@ -210,6 +210,7 @@ class Decoder(nn.Module):
         n_blocks=1,
         num_mid_blocks=2,
         num_heads=4,
+        cross_attention_dim=64,
         act_fn="snake",
         down_block_type="transformer",
         mid_block_type="transformer",
@@ -263,6 +264,7 @@ class Decoder(nn.Module):
                         num_heads,
                         dropout,
                         act_fn,
+                        cross_attention_dim=None,
                     )
                     for _ in range(n_blocks)
                 ]
@@ -288,6 +290,7 @@ class Decoder(nn.Module):
                         num_heads,
                         dropout,
                         act_fn,
+                        cross_attention_dim=cross_attention_dim,
                     )
                     for _ in range(n_blocks)
                 ]
@@ -315,6 +318,7 @@ class Decoder(nn.Module):
                         num_heads,
                         dropout,
                         act_fn,
+                        cross_attention_dim=None
                     )
                     for _ in range(n_blocks)
                 ]
@@ -334,7 +338,7 @@ class Decoder(nn.Module):
         # nn.init.normal_(self.final_proj.weight)
 
     @staticmethod
-    def get_block(block_type, dim, attention_head_dim, num_heads, dropout, act_fn):
+    def get_block(block_type, dim, attention_head_dim, num_heads, dropout, act_fn, cross_attention_dim=None):
         if block_type == "conformer":
             block = ConformerWrapper(
                 dim=dim,
@@ -353,6 +357,7 @@ class Decoder(nn.Module):
                 num_attention_heads=num_heads,
                 attention_head_dim=attention_head_dim,
                 dropout=dropout,
+                cross_attention_dim=cross_attention_dim,
                 activation_fn=act_fn,
             )
         else:
@@ -397,7 +402,7 @@ class Decoder(nn.Module):
         cond_emb = self.cond_norm(cond_emb) * (1 + cond_scale.unsqueeze(-1)) + cond_shift.unsqueeze(-1) # (batch_size, n_feats, mel_timesteps)
         return cond_emb
 
-    def forward(self, x, mask, mu, t, spks=None, cond=None):
+    def forward(self, x, mask, mu, t, spks=None, cond=None, cond_wav=None):
         """Forward pass of the UNet1DConditional model.
 
         Args:
@@ -406,6 +411,8 @@ class Decoder(nn.Module):
             t (_type_): shape (batch_size)
             spks (_type_, optional): shape: (batch_size, condition_channels). Defaults to None.
             cond (_type_, optional): placeholder for future use. Defaults to None.
+            cond_wav (torch.tensor, optional): WaveLM feature. Defaults to None.
+                shape (batch_size, seq_len, wavelm_emb_dim)
 
         Raises:
             ValueError: _description_
@@ -458,6 +465,7 @@ class Decoder(nn.Module):
                 x = transformer_block(
                     hidden_states=x,
                     attention_mask=mask_mid,
+                    encoder_hidden_states=cond_wav,
                     timestep=t,
                 )
             x = rearrange(x, "b t c -> b c t")

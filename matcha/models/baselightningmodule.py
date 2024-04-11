@@ -58,6 +58,7 @@ class BaseLightningClass(LightningModule, ABC):
         y, y_lengths = batch["y"], batch["y_lengths"]
         spks = batch["spks"]
         cond = batch["cond"]
+        cond_wav = batch["cond_wav"]
 
         dur_loss, prior_loss, diff_loss = self(
             x=x,
@@ -67,6 +68,7 @@ class BaseLightningClass(LightningModule, ABC):
             spks=spks,
             out_size=self.out_size,
             cond=cond,
+            cond_wav=cond_wav
         )
         return {
             "dur_loss": dur_loss,

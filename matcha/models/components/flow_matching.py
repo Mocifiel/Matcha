@@ -90,7 +90,7 @@ class BASECFM(torch.nn.Module, ABC):
 
         return sol[-1]
 
-    def compute_loss(self, x1, mask, mu, spks=None, cond=None):
+    def compute_loss(self, x1, mask, mu, spks=None, cond=None, cond_wav=None):
         """Computes diffusion loss
 
         Args:
@@ -102,6 +102,8 @@ class BASECFM(torch.nn.Module, ABC):
                 shape: (batch_size, n_feats, mel_timesteps)
             spks (torch.Tensor, optional): speaker embedding. Defaults to None.
                 shape: (batch_size, spk_emb_dim)
+            cond_wav (torch.Tensor, optional): WaveLM feature. Defaults to None.
+                shape: (batch_size, seq_len, wavelm_emb_dim=1024) 
 
         Returns:
             loss: conditional flow matching loss
@@ -124,7 +126,7 @@ class BASECFM(torch.nn.Module, ABC):
         # print(f't.shape={t.shape}')
         # print(f'u.shape={u.shape}')
 
-        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond), u, reduction="sum") / (
+        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond, cond_wav), u, reduction="sum") / (
             torch.sum(mask) * u.shape[1]
         )
         return loss, y

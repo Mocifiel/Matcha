@@ -138,6 +138,9 @@ class DatasetBuilder(ABC):
         def decode_example(example):
             try:
                 return self.info.features.decode_example(example)
+            except AttributeError as ex:
+                logger.exception(f"Failed to decode example because: {ex}")
+                return None
             except BaseException as ex:
                 logger.exception(f"Failed to decode example with __key__ == {example['__key__']}: {ex}")
                 return None
