@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import soundfile as sf
 import torch
+import librosa 
 
 from matcha.hifigan.config import v1
 from matcha.hifigan.denoiser import Denoiser
@@ -273,6 +274,7 @@ def cli():
     parser.add_argument("--cond_mel", type=str, default=None, help="Condition mel-spectrogram")
     parser.add_argument("--cfk",type=float,default=0,help="Classifier-free guidance coefficient" )
     parser.add_argument("--base_name",type=str,default='utterance',help="Name of output wav")
+    parser.add_argument("--cond_wav", type=str, default=None, help="Condition wavs")
     args = parser.parse_args()
 
     args = validate_args(args)
@@ -429,7 +431,27 @@ def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, sp
         cond_mel = preprocess_cond_mel(cond_mel, conditioning_length=360)
         spk = None
     
-    print(cond_mel.shape)
+    if args.cond_wav is not None:
+        cond_wav, sr = librosa.load(args.cond_wav, sr=None)
+        # assert sr ==22050, f"sampling rate is {sr}, not equal to 22050"
+        cond_wav = librosa.resample(cond_wav, orig_sr=sr, target_sr=16000) # resample to 16khz
+        cond_wav = torch.tensor(cond_wav,device=device)
+
+        if len(cond_wav.shape)==1:
+            cond_wav = cond_wav.unsqueeze(0)
+        if len(cond_wav.shape)==2:
+            cond_wav = cond_wav.unsqueeze(0)
+
+        
+        gap =cond_wav.shape[-1] - 64000 # duration is 4s
+        if gap>0:
+            rand_start = random.randint(0,gap)
+            cond_wav = cond_wav[:,:,rand_start:rand_start+64000]
+        else:
+            cond_wav = torch.nn.functional.pad(cond_wav,(0,-gap),'constant',value=0)
+        print(f'cond_wav.shape is {cond_wav.shape}')
+        
+        
 
     print(f"[🍵] Whisking Matcha-T(ea)TS for: {0}")
     start_t = dt.datetime.now()
@@ -442,6 +464,7 @@ def unbatched_synthesis_phone(args, device, model, vocoder, denoiser, phones, sp
         cond = cond_mel,
         length_scale=args.speaking_rate,
         cfk = cfk,
+        cond_wav = cond_wav,
     )
     # output["waveform"] = to_waveform(output["mel"], vocoder, denoiser)
     # # RTF with HiFiGAN

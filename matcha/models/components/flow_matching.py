@@ -30,7 +30,7 @@ class BASECFM(torch.nn.Module, ABC):
         self.estimator = None
 
     @torch.inference_mode()
-    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, uncond_spks=None,cfk=0):
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, uncond_spks=None,cfk=0,cond_wav=None):
         """Forward diffusion
 
         Args:
@@ -47,6 +47,8 @@ class BASECFM(torch.nn.Module, ABC):
                 Used to implement classifier-free guidance
                 shape: (batch_size, spk_emb_dim)
             cfk: (float, optional): classifier-free guidance coefficient
+            cond_wav (torch.Tensor, optional): wavlm embedding of conditioning wav.
+                shape: (batch_size, 4, 64)
 
         Returns:
             sample: generated mel-spectrogram
@@ -54,9 +56,9 @@ class BASECFM(torch.nn.Module, ABC):
         """
         z = torch.randn_like(mu) * temperature
         t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device)
-        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, uncond_spks=uncond_spks, cfk=cfk)
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, uncond_spks=uncond_spks, cfk=cfk,cond_wav=cond_wav)
 
-    def solve_euler(self, x, t_span, mu, mask, spks, cond, uncond_spks=None, cfk=0):
+    def solve_euler(self, x, t_span, mu, mask, spks, cond, uncond_spks=None, cfk=0,cond_wav=None):
         """
         Fixed euler solver for ODEs.
         Args:
@@ -70,6 +72,9 @@ class BASECFM(torch.nn.Module, ABC):
             spks (torch.Tensor, optional): speaker ids. Defaults to None.
                 shape: (batch_size, spk_emb_dim)
             cond: Not used but kept for future purposes
+
+            cond_wav (torch.Tensor, optional): wavlm embedding of conditioning wav.
+                shape: (batch_size, 4, 64)
         """
         t, _, dt = t_span[0], t_span[-1], t_span[1] - t_span[0]
 
@@ -78,9 +83,9 @@ class BASECFM(torch.nn.Module, ABC):
         sol = []
 
         for step in range(1, len(t_span)):
-            dphi_dt = self.estimator(x, mask, mu, t, spks, cond)
+            dphi_dt = self.estimator(x, mask, mu, t, spks, cond, cond_wav=cond_wav)
             if uncond_spks is not None and cfk>0:
-                dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, cond)
+                dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=cond_wav)
                 dphi_dt = (1+cfk)*dphi_dt -cfk*dphi_dt_uncond
             x = x + dt * dphi_dt
             t = t + dt

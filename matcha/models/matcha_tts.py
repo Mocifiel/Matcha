@@ -39,7 +39,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         optimizer=None,
         scheduler=None,
         prior_loss=True,
-        cond_wave=False,
+        cond_wave=True,
     ):
         super().__init__()
 
@@ -92,8 +92,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # self.wavelm.requires_grad_(False)
             
             self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
-            # state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
-            state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
+            state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
+            # state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
             self.wavelmmodel.load_state_dict(state_dict['model'],strict=False)
             self.wavelmmodel.eval()
             self.wavelmmodel.requires_grad_(False)
@@ -103,7 +103,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         self.update_data_statistics(data_statistics)
 
     @torch.inference_mode()
-    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0,cfk=0.5):
+    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0,cfk=0.5,cond_wav=None):
         """
         Generates mel-spectrogram from text. Returns:
             1. encoder outputs
@@ -125,6 +125,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
                 Increase value to slow down generated speech and vice versa.
             cfk (float, optional): classifier-free guidance
                 Increase value to increase the effect of condition
+            cond_wav (torch.Tensor, optional): conditioning wav.
+                shape: (batch_size, 1, wav_length)
 
         Returns:
             dict: {
@@ -172,7 +174,12 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
         # Generate sample tracing the probability flow
         uncond_spks = self.uncond_emb.repeat(mu_y.shape[0],1) if cfk>0 else None#(batch_size, spk_emb_dim)
-        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, spks,uncond_spks=uncond_spks,cfk=cfk)
+        if cond_wav is not None:
+            cond_wav = self.wavlm_feature2(cond_wav)
+        print(f'cond_wav.shape after wavlm={cond_wav.shape}')
+
+        
+        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, spks,uncond_spks=uncond_spks,cfk=cfk,cond_wav=cond_wav)
         decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         t = (dt.datetime.now() - t).total_seconds()
@@ -253,11 +260,14 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # Get cond embedding
             # spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
             spks = self.cond_embedder(cond).mean(dim=-1) # (batch_size, spk_emb_dim)
-
+        if cond_wav is not None:
+            cond_wav = self.wavlm_feature2(cond_wav)
+        
         if self.unconditioned_percentage > 0:
             unconditioned_batches = torch.rand((x.shape[0],1),device=x.device)<self.unconditioned_percentage
+            unconditioned_batches2 = torch.rand((x.shape[0],1,1),device=x.device)<self.unconditioned_percentage
             spks = torch.where(unconditioned_batches,self.uncond_emb.repeat(x.shape[0],1),spks) # (batch_size, spk_emb_dim)
-
+            cond_wav = torch.where(unconditioned_batches2,torch.zeors_like(cond_wav),cond_wav) # (batch_size, 4, wavlm_emb)
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
         y_max_length = y.shape[-1]
@@ -314,8 +324,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         mu_y = mu_y.transpose(1, 2)
 
         # Compute loss of the decoder
-        if cond_wav is not None:
-            cond_wav = self.wavlm_feature2(cond_wav)
         diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks,cond=None,cond_wav=cond_wav) # flow_matching.py:CFM
 
         if self.prior_loss:

@@ -131,8 +131,8 @@ class UpstreamExpert(UpstreamBase):
     def __init__(self, ckpt, **kwargs):
         super().__init__(**kwargs)
 
-        # ckpt = r"/data2/chong/wavelm/WavLM-Large.pt"
-        ckpt = r"/datablob/bohli/spkemb/WavLM-Large.pt"
+        ckpt = r"/data2/chong/wavelm/WavLM-Large.pt"
+        # ckpt = r"/datablob/bohli/spkemb/WavLM-Large.pt"
         checkpoint = torch.load(ckpt)
 
         self.cfg = WavLMConfig(checkpoint['cfg'])
