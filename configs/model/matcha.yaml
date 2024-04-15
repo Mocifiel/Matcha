@@ -14,3 +14,4 @@ data_statistics: ${data.data_statistics}
 out_size: null # Must be divisible by 4
 unconditioned_percentage: 0.15
 prior_loss: true
+cond_wave: true
