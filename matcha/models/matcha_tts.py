@@ -267,7 +267,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             unconditioned_batches = torch.rand((x.shape[0],1),device=x.device)<self.unconditioned_percentage
             unconditioned_batches2 = torch.rand((x.shape[0],1,1),device=x.device)<self.unconditioned_percentage
             spks = torch.where(unconditioned_batches,self.uncond_emb.repeat(x.shape[0],1),spks) # (batch_size, spk_emb_dim)
-            cond_wav = torch.where(unconditioned_batches2,torch.zeors_like(cond_wav),cond_wav) # (batch_size, 4, wavlm_emb)
+            cond_wav = torch.where(unconditioned_batches2,torch.zeros_like(cond_wav),cond_wav) # (batch_size, 4, wavlm_emb)
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
         mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
         y_max_length = y.shape[-1]
