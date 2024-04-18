@@ -15,7 +15,7 @@ sla_tier="Premium"             # Basic, Standard or Premium
 distributed="false"            # enable distributed training or not
 
 project_name="matcha"    # project name (e.g., tacotron/fastspeech)
-exp_name="matcha-libri-ipad-5"  # experimental name (e.g., Evan/Guy/Aria)
+exp_name="matcha-libri-control-1"  # experimental name (e.g., Evan/Guy/Aria)
 
 # if the packages not installed in the docker, you can install them here
 extra_env_setup_cmd="pip uninstall torch -y; pip install --user torch==2.2.1 torchvision torchaudio; pip install --user ." # or extra_env_setup_cmd=""

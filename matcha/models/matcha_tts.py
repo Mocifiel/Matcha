@@ -92,8 +92,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             n_spks=n_spks,
             spk_emb_dim=spk_emb_dim,
         )
-        # self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
-        self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
+        
 
         if cond_wave:
             # WavLM init
@@ -105,8 +104,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # self.wavelm.requires_grad_(False)
             
             self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
-            # state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
-            state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
+            state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
+            # state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
             self.wavelmmodel.load_state_dict(state_dict['model'],strict=False)
             self.wavelmmodel.eval()
             self.wavelmmodel.requires_grad_(False)
@@ -114,6 +113,10 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
 
         self.update_data_statistics(data_statistics)
+        
+        self.load_all_except_decoder_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        # self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
 
     @torch.inference_mode()
     def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0,cfk=0.5,cond_wav=None):
@@ -372,6 +375,21 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             }
 
         return {"optimizer": optimizer}
+    
+    def load_all_except_decoder_from_ckpt(self,ckpt_path):
+        # load the state dict for any params other than decoder
+        checkpoint = torch.load(ckpt_path)
+        old_state_dict = checkpoint['state_dict']
+
+        all_except_decoder_state_dict = {}
+        for name, param in self.state_dict().items():
+            if not name.startswith('decoder') and name in old_state_dict:
+                all_except_decoder_state_dict[name] = old_state_dict[name]
+            else:
+                all_except_decoder_state_dict[name] = param
+        
+        self.load_state_dict(all_except_decoder_state_dict)
+
 
 if __name__ == "__main__":
     print("test")
