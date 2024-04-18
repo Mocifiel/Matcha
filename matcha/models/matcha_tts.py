@@ -1,7 +1,9 @@
 import datetime as dt
 import math
 import random
-
+import inspect
+from abc import ABC
+from typing import Any, Dict
 import torch
 
 import matcha.utils.monotonic_align as monotonic_align
@@ -74,6 +76,14 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             spk_emb_dim,
         )
 
+        # self.decoder = CFM(
+        #     in_channels=2 * encoder.encoder_params.n_feats,
+        #     out_channel=encoder.encoder_params.n_feats,
+        #     cfm_params=cfm,
+        #     decoder_params=decoder,
+        #     n_spks=n_spks,
+        #     spk_emb_dim=spk_emb_dim,
+        # )
         self.decoder = CFM(
             in_channels=2 * encoder.encoder_params.n_feats,
             out_channel=encoder.encoder_params.n_feats,
@@ -82,6 +92,9 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             n_spks=n_spks,
             spk_emb_dim=spk_emb_dim,
         )
+        # self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
+
         if cond_wave:
             # WavLM init
             # wavelm_checkpoint = torch.load('/data2/chong/wavelm/WavLM-Large.pt')
@@ -333,6 +346,32 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             prior_loss = 0
 
         return dur_loss, prior_loss, diff_loss
+    
+    def configure_optimizers(self) -> Any:
+        optimizer = self.hparams.optimizer(params=self.decoder.controlnet.parameters())
+        if self.hparams.scheduler not in (None, {}):
+            scheduler_args = {}
+            # Manage last epoch for exponential schedulers
+            if "last_epoch" in inspect.signature(self.hparams.scheduler.scheduler).parameters:
+                if hasattr(self, "ckpt_loaded_epoch"):
+                    current_epoch = self.ckpt_loaded_epoch - 1
+                else:
+                    current_epoch = -1
+
+            scheduler_args.update({"optimizer": optimizer})
+            scheduler = self.hparams.scheduler.scheduler(**scheduler_args)
+            scheduler.last_epoch = current_epoch
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": self.hparams.scheduler.lightning_args.interval,
+                    "frequency": self.hparams.scheduler.lightning_args.frequency,
+                    "name": "learning_rate",
+                },
+            }
+
+        return {"optimizer": optimizer}
 
 if __name__ == "__main__":
     print("test")

@@ -3,7 +3,7 @@ from abc import ABC
 import torch
 import torch.nn.functional as F
 
-from matcha.models.components.decoder import Decoder
+from matcha.models.components.decoder import Decoder, ControlledDecoder, ControlNet
 from matcha.utils.pylogger import get_pylogger
 
 log = get_pylogger(__name__)
@@ -28,6 +28,7 @@ class BASECFM(torch.nn.Module, ABC):
             self.sigma_min = 1e-4
 
         self.estimator = None
+        self.controlnet = None
 
     @torch.inference_mode()
     def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, uncond_spks=None,cfk=0,cond_wav=None):
@@ -124,16 +125,14 @@ class BASECFM(torch.nn.Module, ABC):
 
         y = (1 - (1 - self.sigma_min) * t) * z + t * x1
         u = x1 - (1 - self.sigma_min) * z
-        # debugging
-        # print(f'y.shape={y.shape}')
-        # print(f'mask.shape={mask.shape}')
-        # print(f'mu.shape={mu.shape}')
-        # print(f't.shape={t.shape}')
-        # print(f'u.shape={u.shape}')
+        
+        controls = self.controlnet(y, mask, mu, t.squeeze(), spks, cond_wav=cond_wav)
+        outs = self.estimator(y, mask, mu, t.squeeze(), spks, control=controls)
+        loss = F.mse_loss(outs, u, reduction="sum") / (torch.sum(mask) * u.shape[1])
 
-        loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond, cond_wav), u, reduction="sum") / (
-            torch.sum(mask) * u.shape[1]
-        )
+        # loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond, cond_wav), u, reduction="sum") / (
+        #     torch.sum(mask) * u.shape[1]
+        # )
         return loss, y
 
 
@@ -148,4 +147,79 @@ class CFM(BASECFM):
 
         in_channels = in_channels + (spk_emb_dim if n_spks > 1 else 0)
         # Just change the architecture of the estimator here
-        self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+        # self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+        self.estimator = ControlledDecoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+        self.controlnet = ControlNet(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+    
+    def load_from_ckpt(self,ckpt_path):
+        checkpoint = torch.load(ckpt_path)
+        # 获取decoder.estimator模型的参数字典
+        estimator_state_dict = {}
+        for name, param in checkpoint['state_dict'].items():
+            if name.startswith('decoder.estimator'):  # 选择只包含decoder的参数
+                estimator_state_dict[name.replace('decoder.estimator.','')] = param
+        controlnet_state_dict = {}
+        for name, param in self.controlnet.state_dict().items():
+            if name in estimator_state_dict:
+                controlnet_state_dict[name]= estimator_state_dict[name]
+            else:
+                controlnet_state_dict[name] = param
+        # 加载参数到decoder模型
+        self.estimator.load_state_dict(estimator_state_dict)
+        self.controlnet.load_state_dict(controlnet_state_dict)
+        
+
+
+if __name__ == "__main__":
+    import yaml
+    from easydict import EasyDict
+    # 读取YAML文件内容
+    with open("/home/chong/Matcha-TTS/configs/model/decoder/default.yaml", "r") as file:
+        decoder_params = yaml.safe_load(file)
+    decoder_params['cross_attention_dim']=None
+    cfm_params  = EasyDict({'name': 'CFM','solver':'euler','sigma_min':1e-4})
+    cfm = CFM(in_channels=160,
+              out_channel=80,
+              cfm_params=cfm_params,
+              decoder_params=decoder_params,
+              n_spks=2426,
+              spk_emb_dim=64)
+    cfm.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+    
+    
+    # checkpoint = torch.load('/data/chong/matcha/models/cfg-mean-80.ckpt')
+    # # 获取decoder.estimator模型的参数字典
+    # estimator_state_dict = {}
+    # for name, param in checkpoint['state_dict'].items():
+    #     if name.startswith('decoder.estimator'):  # 选择只包含decoder的参数
+    #         estimator_state_dict[name.replace('decoder.estimator.','')] = param
+    # controlnet_state_dict = {}
+    # for name, param in cfm.controlnet.state_dict().items():
+    #     if name in estimator_state_dict:
+    #         controlnet_state_dict[name]= estimator_state_dict[name]
+    #     else:
+    #         controlnet_state_dict[name] = param
+
+
+
+    # # 加载参数到decoder模型
+    # cfm.estimator.load_state_dict(estimator_state_dict)
+    # cfm.controlnet.load_state_dict(controlnet_state_dict)
+    print(cfm.controlnet.state_dict()['input_control_block.bias'])
+    # print(list(cfm.controlnet.state_dict().keys()))
+    print('start')
+    x = torch.randn(4,80,74)
+    mu = torch.randn(4,80,74)
+    mask = torch.ones(4,1,74)
+    t = torch.rand(4,)
+    spks = torch.rand(4,64)
+    cond_wav = torch.rand(4,4,64)
+
+    outs = cfm.controlnet.forward(x,mask,mu,t,spks=spks,cond_wav=cond_wav)
+    print(outs)
+    final_outs = cfm.estimator.forward(x,mask,mu,t,spks,control=outs)
+
+    print(final_outs.shape)
+    
+
+

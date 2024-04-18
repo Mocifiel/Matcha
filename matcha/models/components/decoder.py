@@ -217,13 +217,14 @@ class Decoder(nn.Module):
         n_blocks=1,
         num_mid_blocks=2,
         num_heads=4,
-        cross_attention_dim=64,
+        cross_attention_dim=None,
         act_fn="snake",
         down_block_type="transformer",
         mid_block_type="transformer",
         up_block_type="transformer",
         use_cond = False
     ):
+        
         super().__init__()
         channels = tuple(channels)
         self.in_channels = in_channels
@@ -523,6 +524,7 @@ class ControlNet(nn.Module):
         down_block_type="transformer",
         mid_block_type="transformer",
         up_block_type="transformer",
+        use_cond = False,
     ):
         super().__init__()
         channels = tuple(channels)
