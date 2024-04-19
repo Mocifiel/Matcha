@@ -11,11 +11,11 @@ gpus_per_node=1                # each node with 1 GPU
 memory_size=32                 # 16GB
 gpu_type="V100"                # V100 GPU
 interconnect_type="Empty"      # "Empty", "IB", "NvLink", "xGMI", "IB-xGMI", "NvLink-xGMI"
-sla_tier="Premium"             # Basic, Standard or Premium
+sla_tier="Standard"             # Basic, Standard or Premium
 distributed="false"            # enable distributed training or not
 
 project_name="matcha"    # project name (e.g., tacotron/fastspeech)
-exp_name="matcha-libri-control-1"  # experimental name (e.g., Evan/Guy/Aria)
+exp_name="matcha-libri-control-3"  # experimental name (e.g., Evan/Guy/Aria)
 
 # if the packages not installed in the docker, you can install them here
 extra_env_setup_cmd="pip uninstall torch -y; pip install --user torch==2.2.1 torchvision torchaudio; pip install --user ." # or extra_env_setup_cmd=""
@@ -43,7 +43,7 @@ python -u third_party/Submitter/utils/amlt_submit.py \
   --data-container-name "data" --model-container-name "philly-ipgsp" \
   --extra-env-setup-cmd "${extra_env_setup_cmd}" --local-code-dir "$(pwd)" \
   --amlt-project ${project_name} --exp-name ${exp_name} \
-  --run-cmd "python matcha/train.py data=libri_sing data.batch_size=64 run_name=libri_1 ckpt_path=/datablob/v-chongzhang/last.ckpt" \
+  --run-cmd "python matcha/train.py data=libri_sing data.batch_size=64 run_name=libri_1 model.optimizer=2e-5" \
   --enable-cyber-eo "false" \
   --tool-type "Hydra"
 #  --extra-params "${extra_params}" 
