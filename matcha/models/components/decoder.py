@@ -207,6 +207,7 @@ class Decoder(nn.Module):
         channels=(256, 256),
         dropout=0.05,
         attention_head_dim=64,
+        cross_attention_dim=None,
         n_blocks=1,
         num_mid_blocks=2,
         num_heads=4,
