@@ -116,7 +116,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         
         # self.load_all_except_decoder_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
         self.load_all_except_decoder_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
-        
         # self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
         self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
 
