@@ -102,7 +102,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # self.wavelm.load_state_dict(wavelm_checkpoint['model'])
             # self.wavelm.eval()
             # self.wavelm.requires_grad_(False)
-            
             self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
             # state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
             state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
