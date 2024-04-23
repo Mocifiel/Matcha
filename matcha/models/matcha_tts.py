@@ -103,7 +103,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         self.update_data_statistics(data_statistics)
 
     @torch.inference_mode()
-    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,length_scale=1.0,cfk=0.5,cond_wav=None):
+    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,
+                   length_scale=1.0,cfk=0.5,cond_wav=None, cond_mel2=None):
         """
         Generates mel-spectrogram from text. Returns:
             1. encoder outputs

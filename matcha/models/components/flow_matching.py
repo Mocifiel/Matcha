@@ -91,7 +91,7 @@ class BASECFM(torch.nn.Module, ABC):
 
                 # dphi_dt = dphi_dt +cfk*(dphi_dt-dphi_dt_uncond0) +cfk*(dphi_dt_uncond1+dphi_dt_uncond2-2*dphi_dt_uncond0)
             # x = x + dt * dphi_dt
-            x = x + dt * (dphi_dt+cfk*(dphi_dt_uncond2-dphi_dt_uncond0))
+            x = x + dt * (dphi_dt+cfk*(dphi_dt-dphi_dt_uncond0))
             t = t + dt
             sol.append(x)
             if step < len(t_span) - 1:
