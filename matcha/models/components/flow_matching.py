@@ -84,10 +84,24 @@ class BASECFM(torch.nn.Module, ABC):
         sol = []
 
         for step in range(1, len(t_span)):
-            dphi_dt = self.estimator(x, mask, mu, t, spks, cond, cond_wav=cond_wav)
+            # dphi_dt = self.estimator(x, mask, mu, t, spks, cond, cond_wav=cond_wav)
+
+            controls = self.controlnet(x, mask, mu, t, spks, cond_wav=cond_wav)
+            dphi_dt = self.estimator(x, mask, mu, t, spks, control=controls)
+
+
+
             if uncond_spks is not None and cfk>0:
-                dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=cond_wav)
+                # dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=cond_wav)
+                # controls = self.controlnet(x, mask, mu, t, uncond_spks, cond_wav=torch.zeros_like(cond_wav))
+                dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, control=None)
+                
                 dphi_dt = (1+cfk)*dphi_dt -cfk*dphi_dt_uncond
+                
+
+
+
+
             x = x + dt * dphi_dt
             t = t + dt
             sol.append(x)
