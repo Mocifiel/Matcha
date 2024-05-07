@@ -1,7 +1,9 @@
 import datetime as dt
 import math
 import random
-
+import inspect
+from abc import ABC
+from typing import Any, Dict
 import torch
 
 import matcha.utils.monotonic_align as monotonic_align
@@ -98,6 +100,9 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             self.wavelmmodel.eval()
             self.wavelmmodel.requires_grad_(False)
         
+        # self.load_all_except_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')       
+        self.load_all_except_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        self.freeze_parameters()
 
 
         self.update_data_statistics(data_statistics)
@@ -334,6 +339,100 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             prior_loss = 0
 
         return dur_loss, prior_loss, diff_loss
+    def configure_optimizers(self) -> Any:
+        optimizer = self.hparams.optimizer(params=self.decoder.estimator.mid_blocks.parameters())
+        if self.hparams.scheduler not in (None, {}):
+            scheduler_args = {}
+            # Manage last epoch for exponential schedulers
+            if "last_epoch" in inspect.signature(self.hparams.scheduler.scheduler).parameters:
+                if hasattr(self, "ckpt_loaded_epoch"):
+                    current_epoch = self.ckpt_loaded_epoch - 1
+                else:
+                    current_epoch = -1
+
+            scheduler_args.update({"optimizer": optimizer})
+            scheduler = self.hparams.scheduler.scheduler(**scheduler_args)
+            scheduler.last_epoch = current_epoch
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "interval": self.hparams.scheduler.lightning_args.interval,
+                    "frequency": self.hparams.scheduler.lightning_args.frequency,
+                    "name": "learning_rate",
+                },
+            }
+
+        return {"optimizer": optimizer}
+    
+    def load_all_except_from_ckpt(self,ckpt_path):
+        # load the state dict for any params other than decoder
+        checkpoint = torch.load(ckpt_path)
+        old_state_dict = checkpoint['state_dict']
+
+        all_except_decoder_state_dict = {}
+        for name, param in self.state_dict().items():
+            if not name.startswith('decoder.estimator.mid_blocks') and name in old_state_dict:
+                all_except_decoder_state_dict[name] = old_state_dict[name]
+            else:
+                all_except_decoder_state_dict[name] = param
+        
+        self.load_state_dict(all_except_decoder_state_dict)
+    
+    def freeze_parameters(self):
+        self.cond_embedder.requires_grad_(False)
+        self.uncond_emb.requires_grad_(False)
+        self.encoder.requires_grad_(False)
+
+        for name, param in self.decoder.named_parameters():
+            if 'mid_blocks' not in name:
+                param.requires_grad_(False)
+        
+        
+
 
 if __name__ == "__main__":
     print("test")
+    import yaml
+    from easydict import EasyDict
+    with open('/home/chong/Matcha-TTS/configs/model/decoder/ip_adapter.yaml', 'r') as f:
+        dec_config = yaml.safe_load(f)
+    
+    enc_config = EasyDict({'encoder_type': 'RoPE Encoder','encoder_params': {
+  'n_feats':80,
+  'n_channels': 192,
+  'filter_channels': 768,
+  'filter_channels_dp': 256,
+  'n_heads': 2,
+  'n_layers': 6,
+  'kernel_size': 3,
+  'p_dropout': 0.1,
+  'spk_emb_dim': 64,
+  'n_spks': 1,
+  'prenet': True,
+},
+'duration_predictor_params':{
+  'filter_channels_dp': 256,
+  'kernel_size': 3,
+  'p_dropout': 0.1}
+    })
+
+    cfm_config = EasyDict({'name': 'CFM', 'solver': 'euler','sigma_min': 1e-4})
+    matcha = MatchaTTS(n_vocab=7094,
+                       n_spks=2426,
+                       spk_emb_dim=64,
+                       n_feats=80,
+                       encoder=enc_config,
+                       decoder=dec_config,
+                       cfm=cfm_config,
+                       data_statistics={'mel_mean': 0,
+                                        'mel_std': 1},
+                        out_size=None,
+                        unconditioned_percentage=0.15,
+                        prior_loss=True,
+                        cond_wave=True)
+    for name,param in matcha.named_parameters():
+        if param.requires_grad:
+            print(f"Parameter name: {name}, Size: {param.size()}")
+    for name,param in matcha.decoder.estimator.mid_blocks.named_parameters():
+        print(name)
