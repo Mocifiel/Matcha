@@ -76,14 +76,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             spk_emb_dim,
         )
 
-        # self.decoder = CFM(
-        #     in_channels=2 * encoder.encoder_params.n_feats,
-        #     out_channel=encoder.encoder_params.n_feats,
-        #     cfm_params=cfm,
-        #     decoder_params=decoder,
-        #     n_spks=n_spks,
-        #     spk_emb_dim=spk_emb_dim,
-        # )
         self.decoder = CFM(
             in_channels=2 * encoder.encoder_params.n_feats,
             out_channel=encoder.encoder_params.n_feats,
@@ -96,30 +88,18 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
         if cond_wave:
             # WavLM init
-            # wavelm_checkpoint = torch.load('/data2/chong/wavelm/WavLM-Large.pt')
-            # self.wavelm_cfg = WavLMConfig(wavelm_checkpoint['cfg'])
-            # self.wavelm = WavLM(self.wavelm_cfg)
-            # self.wavelm.load_state_dict(wavelm_checkpoint['model'])
-            # self.wavelm.eval()
-            # self.wavelm.requires_grad_(False)
             self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
             state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
             # state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
             self.wavelmmodel.load_state_dict(state_dict['model'],strict=False)
             self.wavelmmodel.eval()
             self.wavelmmodel.requires_grad_(False)
-        
-        # self.load_all_except_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')       
-        self.load_all_except_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
-        self.freeze_parameters()
-
 
         self.update_data_statistics(data_statistics)
-        
-        self.load_all_except_decoder_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
-        # self.load_all_except_decoder_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
-        self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
-        # self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
+
+        # self.load_all_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')       
+        self.load_all_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        self.freeze_parameters()
 
     @torch.inference_mode()
     def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,
@@ -195,7 +175,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
         # Generate sample tracing the probability flow
         uncond_spks = self.uncond_emb.repeat(mu_y.shape[0],1) if cfk>0 else None#(batch_size, spk_emb_dim)
         if cond_wav is not None:
-            cond_wav = self.wavlm_feature2(cond_wav)
+            cond_wav = self.wavlm_feature(cond_wav)
         print(f'cond_wav.shape after wavlm={cond_wav.shape}')
 
         
@@ -213,25 +193,9 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             "mel_lengths": y_lengths,
             "rtf": rtf,
         }
-    
+
     @torch.no_grad()
     def wavlm_feature(self,cond_wav=None):
-        """
-        cond_wav (torch.Tensor, optional): conditioning wav.
-                shape: (batch_size, 1, wav_length)
-        """
-        
-        # extract the representation of each layer
-        if self.wavelm_cfg.normalize:
-            cond_wav = torch.nn.functional.layer_norm(cond_wav.squeeze() , (cond_wav.shape[-1],))
-
-        rep, layer_results = self.wavelm.extract_features(cond_wav, output_layer=self.wavelm.cfg.encoder_layers, ret_layer_results=True)[0]
-        layer_reps = [x.transpose(0, 1) for x, _ in layer_results]
-        layer_reps = torch.stack(layer_reps,dim=-1).mean(dim=-1) #
-        return layer_reps
-
-    @torch.no_grad()
-    def wavlm_feature2(self,cond_wav=None):
         """
         cond_wav (torch.Tensor, optional): conditioning wav.
                 shape: (batch_size, 1, wav_length)
@@ -281,7 +245,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # spks = self.cond_embedder(cond)[:,:,0] # (batch_size, spk_emb_dim)
             spks = self.cond_embedder(cond).mean(dim=-1) # (batch_size, spk_emb_dim)
         if cond_wav is not None:
-            cond_wav = self.wavlm_feature2(cond_wav)
+            cond_wav = self.wavlm_feature(cond_wav)
         
         if self.unconditioned_percentage > 0:
             unconditioned_batches = torch.rand((x.shape[0],1),device=x.device)<self.unconditioned_percentage
@@ -379,26 +343,26 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
         return {"optimizer": optimizer}
     
-    def load_all_except_from_ckpt(self,ckpt_path):
-        # load the state dict for any params other than decoder
+    def load_all_from_ckpt(self,ckpt_path):
+        # load the state dict for any params that exist in the pretrained model
         checkpoint = torch.load(ckpt_path)
         old_state_dict = checkpoint['state_dict']
 
-        all_except_decoder_state_dict = {}
+        all_state_dict = {}
         for name, param in self.state_dict().items():
-            if not name.startswith('decoder.estimator.mid_blocks') and name in old_state_dict:
-                all_except_decoder_state_dict[name] = old_state_dict[name]
+            if name in old_state_dict:
+                all_state_dict[name] = old_state_dict[name]
             else:
-                all_except_decoder_state_dict[name] = param
+                all_state_dict[name] = param
         
-        self.load_state_dict(all_except_decoder_state_dict)
+        self.load_state_dict(all_state_dict)
     
     def freeze_parameters(self):
         self.cond_embedder.requires_grad_(False)
         self.uncond_emb.requires_grad_(False)
         self.encoder.requires_grad_(False)
 
-        for name, param in self.decoder.named_parameters():
+        for name, param in self.decoder.estimator.named_parameters():
             if 'mid_blocks' not in name:
                 param.requires_grad_(False)
         
