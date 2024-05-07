@@ -76,6 +76,14 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             spk_emb_dim,
         )
 
+        # self.decoder = CFM(
+        #     in_channels=2 * encoder.encoder_params.n_feats,
+        #     out_channel=encoder.encoder_params.n_feats,
+        #     cfm_params=cfm,
+        #     decoder_params=decoder,
+        #     n_spks=n_spks,
+        #     spk_emb_dim=spk_emb_dim,
+        # )
         self.decoder = CFM(
             in_channels=2 * encoder.encoder_params.n_feats,
             out_channel=encoder.encoder_params.n_feats,
@@ -84,6 +92,8 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             n_spks=n_spks,
             spk_emb_dim=spk_emb_dim,
         )
+        
+
         if cond_wave:
             # WavLM init
             # wavelm_checkpoint = torch.load('/data2/chong/wavelm/WavLM-Large.pt')
@@ -92,7 +102,6 @@ class MatchaTTS(BaseLightningClass):  # 🍵
             # self.wavelm.load_state_dict(wavelm_checkpoint['model'])
             # self.wavelm.eval()
             # self.wavelm.requires_grad_(False)
-            
             self.wavelmmodel = ECAPA_TDNN_SMALL(feat_dim=1024, feat_type='wavlm_large', config_path=None, update_extract=False)
             state_dict = torch.load('/data2/chong/wavelm/wavlm_large_finetune.pth', map_location='cpu')
             # state_dict = torch.load("/datablob/bohli/spkemb/wavlm_large_finetune.pth", map_location='cpu')
@@ -106,6 +115,11 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
 
         self.update_data_statistics(data_statistics)
+        
+        self.load_all_except_decoder_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        # self.load_all_except_decoder_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
+        self.decoder.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+        # self.decoder.load_from_ckpt('/datablob/v-chongzhang/cfg-mean-80.ckpt')
 
     @torch.inference_mode()
     def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, cond=None,
@@ -340,7 +354,7 @@ class MatchaTTS(BaseLightningClass):  # 🍵
 
         return dur_loss, prior_loss, diff_loss
     def configure_optimizers(self) -> Any:
-        optimizer = self.hparams.optimizer(params=self.decoder.estimator.mid_blocks.parameters())
+        optimizer = self.hparams.optimizer(params=list(self.decoder.estimator.mid_blocks.parameters())+list(self.decoder.controlnet.parameters()))
         if self.hparams.scheduler not in (None, {}):
             scheduler_args = {}
             # Manage last epoch for exponential schedulers
