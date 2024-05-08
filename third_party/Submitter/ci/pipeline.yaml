@@ -1,0 +1,64 @@
+# Copyright (c) Microsoft Corporation. All rights reserved.
+
+
+trigger:
+  branches:
+    include:
+    - master
+    - main
+
+schedules:
+- cron: "0 0 1/14 * *" # At 00:00 on every 14th day-of-month from 1 through 31.
+  displayName: Run biweekly to avoid vulnerabilities
+  branches:
+    include:
+      - master
+  always: true
+
+jobs:
+
+- job: "SubmitterPRTest"
+  pool:
+    vmImage: "ubuntu-20.04"
+  strategy:
+    matrix:
+      Python38:
+        python.version: "3.8"
+      Python39:
+        python.version: "3.9"
+
+  steps:
+  - checkout: self
+    clean: true
+    lfs: true
+    fetchDepth: 1
+    submodules: false
+    persistCredentials: true
+
+  - task: PipAuthenticate@1
+    displayName: Authenticate Pip Feed
+    inputs:
+      artifactFeeds: "Submitter/SpeeDME"
+
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: "$(python.version)"
+
+  - task: Bash@3
+    displayName: 'Install AMLT and ZettA'
+    inputs:
+      targetType: "inline"
+      script: |
+        sudo apt-get update
+        bash tools/linux/update_amlt.sh
+        python -m pip install --upgrade pip
+        pip install keyring artifacts-keyring
+        pip install azure-core azureml-sdk azure-storage-blob
+        pip install zettasdk zettasdk-batch
+
+  - task: ComponentGovernanceComponentDetection@0
+    displayName: Component Governance Detection
+    inputs:
+      scanType: "Register"
+      verbosity: "Verbose"
+      alertWarningLevel: "High"

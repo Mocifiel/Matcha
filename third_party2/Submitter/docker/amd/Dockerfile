@@ -1,6 +1,5 @@
 # https://singularitydocs.azurewebsites.net/docs/tutorials/custom_images/#singularity-image-validator
-# Can ask (Sheetal Arum Kadam -> Sunghoon Choi -> Yue-Sheng Liu -> Yuan Yu) to update the docker image
-ARG BASE_IMAGE="ptebic.azurecr.io/internal/aifx/acpt/stable-ubuntu2004-rocm57-py310-torch201"
+ARG BASE_IMAGE="ptebic.azurecr.io/public/azureml/aifx/stable-ubuntu2004-rocm542-py38-torch201"
 ARG INSTALLER_IMAGE
 ARG VALIDATOR_IMAGE
 
@@ -10,7 +9,7 @@ FROM $VALIDATOR_IMAGE as validator
 
 FROM base
 
-LABEL maintainer="Ke Wang <wake@microsoft.com>"
+MAINTAINER Ke Wang <wake@microsoft.com>
 
 # Set arguments
 ARG TIME_ZONE=Asia/Shanghai

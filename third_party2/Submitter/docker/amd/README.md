@@ -13,15 +13,14 @@ for setting up Docker Engine are
 ### Build
 
 ```sh
-# login
-az login --use-device-code
-az acr login --name sramdevregistry
 # build
 bash build.sh
-# push to ACR
-docker push sramdevregistry.azurecr.io/submitter:pytorch201-py310-rocm57-ubuntu2004
+# login (for first time)
+docker login
+# push to Docker Hub
+docker push sramdevregistry.azurecr.io/pytorch:2.0.1-py38-rocm5.4-ubuntu20.04
 # pull
-docker pull sramdevregistry.azurecr.io/submitter:pytorch201-py310-rocm57-ubuntu2004
+docker pull sramdevregistry.azurecr.io/pytorch:2.0.1-py38-rocm5.4-ubuntu20.04
 ```
 
 ### Running PyTorch scripts
@@ -34,7 +33,7 @@ the following command:
 ```bash
 docker run --rm -it --init \
   -v /mnt/workspace:/mnt/workspace \
-  sramdevregistry.azurecr.io/submitter:pytorch201-py310-rocm57-ubuntu2004 bash
+  sramdevregistry.azurecr.io/pytorch:2.0.1-py38-rocm5.4-ubuntu20.04 bash
 ```
 
 Here's a description of the Docker command-line options shown above:

@@ -22,15 +22,14 @@ within Docker containers. This can be found at
 ### Build
 
 ```sh
-# login
-az login --use-device-code
-az acr login --name sramdevregistry
 # build
-bash build.sh
+docker build -t sramdevregistry.azurecr.io/pytorch:2.0.1-py39-cuda11.7-ubuntu20.04 .
+# login (for first time)
+docker login
 # push to Docker Hub
-docker push sramdevregistry.azurecr.io/submitter:pytorch222-py310-cuda118-ubuntu2004
+docker push sramdevregistry.azurecr.io/pytorch:2.0.1-py39-cuda11.7-ubuntu20.04
 # pull
-docker pull sramdevregistry.azurecr.io/submitter:pytorch222-py310-cuda118-ubuntu2004
+docker pull sramdevregistry.azurecr.io/pytorch:2.0.1-py39-cuda11.7-ubuntu20.04
 ```
 
 ### Running PyTorch scripts
@@ -46,7 +45,7 @@ docker run --rm -it --init \
   --ipc=host \
   -v /mnt/workspace:/mnt/workspace \
   -e NVIDIA_VISIBLE_DEVICES=0 \
-  sramdevregistry.azurecr.io/submitter:pytorch222-py310-cuda118-ubuntu2004 bash
+  sramdevregistry.azurecr.io/pytorch:2.0.1-py39-cuda11.7-ubuntu20.04 bash
 ```
 
 Here's a description of the Docker command-line options shown above:
