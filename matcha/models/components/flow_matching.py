@@ -175,17 +175,17 @@ class CFM(BASECFM):
         # 获取decoder.estimator模型的参数字典
         estimator_state_dict = {}
         for name, param in checkpoint['state_dict'].items():
-            if name.startswith('decoder.estimator'):  # 选择只包含decoder的参数
+            if name.startswith('decoder.estimator'):  # 选择只包含decoder.estimator的参数
                 estimator_state_dict[name.replace('decoder.estimator.','')] = param
-        controlnet_state_dict = {}
-        for name, param in self.controlnet.state_dict().items():
-            if name in estimator_state_dict:
-                controlnet_state_dict[name]= estimator_state_dict[name]
-            else:
-                controlnet_state_dict[name] = param
+        # controlnet_state_dict = {}
+        # for name, param in self.controlnet.state_dict().items():
+        #     if name in estimator_state_dict:
+        #         controlnet_state_dict[name]= estimator_state_dict[name]
+        #     else:
+        #         controlnet_state_dict[name] = param
         # 加载参数到decoder模型
-        self.estimator.load_state_dict(estimator_state_dict)
-        self.controlnet.load_state_dict(controlnet_state_dict)
+        self.estimator.load_state_dict(estimator_state_dict,strict=False)
+        self.controlnet.load_state_dict(estimator_state_dict,strict=False)
         
 
 
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     # 读取YAML文件内容
     with open("/home/chong/Matcha-TTS/configs/model/decoder/default.yaml", "r") as file:
         decoder_params = yaml.safe_load(file)
-    decoder_params['cross_attention_dim']=None
+    decoder_params['cross_attention_dim']=64
     cfm_params  = EasyDict({'name': 'CFM','solver':'euler','sigma_min':1e-4})
     cfm = CFM(in_channels=160,
               out_channel=80,
@@ -204,28 +204,10 @@ if __name__ == "__main__":
               n_spks=2426,
               spk_emb_dim=64)
     cfm.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
-    
-    
-    # checkpoint = torch.load('/data/chong/matcha/models/cfg-mean-80.ckpt')
-    # # 获取decoder.estimator模型的参数字典
-    # estimator_state_dict = {}
-    # for name, param in checkpoint['state_dict'].items():
-    #     if name.startswith('decoder.estimator'):  # 选择只包含decoder的参数
-    #         estimator_state_dict[name.replace('decoder.estimator.','')] = param
-    # controlnet_state_dict = {}
-    # for name, param in cfm.controlnet.state_dict().items():
-    #     if name in estimator_state_dict:
-    #         controlnet_state_dict[name]= estimator_state_dict[name]
-    #     else:
-    #         controlnet_state_dict[name] = param
-
-
-
-    # # 加载参数到decoder模型
-    # cfm.estimator.load_state_dict(estimator_state_dict)
-    # cfm.controlnet.load_state_dict(controlnet_state_dict)
-    print(cfm.controlnet.state_dict()['input_control_block.bias'])
+    # print(cfm.controlnet.state_dict()['input_control_block.bias'])
     # print(list(cfm.controlnet.state_dict().keys()))
+    for key in cfm.estimator.state_dict():
+        print(key)
     print('start')
     x = torch.randn(4,80,74)
     mu = torch.randn(4,80,74)
@@ -236,8 +218,7 @@ if __name__ == "__main__":
 
     outs = cfm.controlnet.forward(x,mask,mu,t,spks=spks,cond_wav=cond_wav)
     print(outs)
-    final_outs = cfm.estimator.forward(x,mask,mu,t,spks,control=outs)
-
+    final_outs = cfm.estimator.forward(x,mask,mu,t,spks,control=outs,cond_wav=cond_wav)
     print(final_outs.shape)
     
 
