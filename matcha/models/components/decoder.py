@@ -747,7 +747,7 @@ class ControlNet(nn.Module):
         return hiddens
 
 class ControlledDecoder(Decoder):
-    def forward(self, x, mask, mu, t, spks=None, cond=None, control=None, only_mid_control=False):
+    def forward(self, x, mask, mu, t, spks=None, cond=None, control=None, only_mid_control=False, cond_wav=None):
         """Forward pass of the controlled UNet1DConditional model.
 
         Args:
@@ -758,6 +758,8 @@ class ControlledDecoder(Decoder):
             cond (_type_, optional): placeholder for future use. Defaults to None.
             control (torch.tensor, optional):
             only_mid_control (bool, optional):
+            cond_wav (torch.tensor, optional): WaveLM feature. Defaults to None.
+                shape (batch_size, seq_len, wavelm_emb_dim)
 
         Raises:
             ValueError: _description_
@@ -811,7 +813,7 @@ class ControlledDecoder(Decoder):
                     x = transformer_block(
                         hidden_states=x,
                         attention_mask=mask_mid,
-                        # encoder_hidden_states=cond_wav,
+                        encoder_hidden_states=cond_wav,
                         timestep=t,
                     )
                 x = rearrange(x, "b t c -> b c t")
@@ -849,7 +851,7 @@ if __name__ == "__main__":
                              act_fn="snakebeta")
     control_dec = ControlledDecoder(in_channels=224,
                                     out_channels=80,
-                                    cross_attention_dim=None,
+                                    cross_attention_dim=64,
                                     act_fn="snakebeta")
     print('start')
     x = torch.randn(4,80,74)
@@ -860,7 +862,7 @@ if __name__ == "__main__":
     cond_wav = torch.rand(4,4,64)
 
     outs = control_net.forward(x,mask,mu,t,spks=spks,cond_wav=cond_wav)
-    final_outs = control_dec.forward(x,mask,mu,t,spks,control=outs)
+    final_outs = control_dec.forward(x,mask,mu,t,spks,control=outs,cond_wav=cond_wav)
 
     print(final_outs.shape)
 

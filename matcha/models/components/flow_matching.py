@@ -145,7 +145,7 @@ class BASECFM(torch.nn.Module, ABC):
         u = x1 - (1 - self.sigma_min) * z
         
         controls = self.controlnet(y, mask, mu, t.squeeze(), spks, cond_wav=cond_wav)
-        outs = self.estimator(y, mask, mu, t.squeeze(), spks, control=controls)
+        outs = self.estimator(y, mask, mu, t.squeeze(), spks, control=controls,cond_wav=cond_wav)
         loss = F.mse_loss(outs, u, reduction="sum") / (torch.sum(mask) * u.shape[1])
 
         # loss = F.mse_loss(self.estimator(y, mask, mu, t.squeeze(), spks, cond, cond_wav), u, reduction="sum") / (
@@ -167,6 +167,7 @@ class CFM(BASECFM):
         # Just change the architecture of the estimator here
         # self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
         self.estimator = ControlledDecoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+        decoder_params['cross_attention_dim'] = None # the cross_attn_dim param in decoder_params will not be used in controlnet
         self.controlnet = ControlNet(in_channels=in_channels, out_channels=out_channel, **decoder_params)
     
     def load_from_ckpt(self,ckpt_path):
