@@ -11,15 +11,13 @@ def get_premium_storage_by_region_name(region):
         "eastus":         "exawattaiprmbtts01eus",
         "southcentralus": "exawattaiprmbtts01scus",
         "westus2":        "exawattaiprmbtts01wus2",
-        "redmond":        "exawattaiprmbtts01wus2",
-        "rrlab":          "exawattaiprmbtts01wus2",
+        "westus3":        "exawattaiprmbtts01wus2",
     }
 
     if region in region_storage_dict:
         return region_storage_dict[region]
     else:
-        raise ValueError(
-            f"Cannot find the storage account for region {region}")
+        raise ValueError(f"Cannot find the storage account for region {region}")
 
 
 def get_standard_storage_by_region_name(region):
@@ -29,8 +27,20 @@ def get_standard_storage_by_region_name(region):
         "eastus":         "stdstoragetts01eus",
         "southcentralus": "stdstoragetts01scus",
         "westus2":        "stdstoragetts01wus2",
-        "redmond":        "stdstoragetts01wus2",
-        "rrlab":          "stdstoragetts01wus2",
+        "westus3":        "stdstoragetts01wus2",
+    }
+
+    if region in region_storage_dict:
+        return region_storage_dict[region]
+    else:
+        raise ValueError(f"Cannot find the storage account for region {region}")
+
+
+def get_persistent_storage_by_region_name(region):
+    """get associated storage account for a region"""
+
+    region_storage_dict = {
+        "southcentralus": "dataprocessingscus",
     }
 
     if region in region_storage_dict:

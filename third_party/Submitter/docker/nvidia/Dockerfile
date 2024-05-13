@@ -1,5 +1,5 @@
-# https://singularitydocs.azurewebsites.net/docs/tutorials/custom_images/#singularity-image-validator
-ARG BASE_IMAGE="ptebic.azurecr.io/public/azureml/aifx/stable-ubuntu2004-cu117-py39-torch201"
+# Can ask (Sheetal Arum Kadam -> Sunghoon Choi -> Yue-Sheng Liu -> Yuan Yu) to update the docker image
+ARG BASE_IMAGE="ptebic.azurecr.io/public/aifx/acpt/stable-ubuntu2004-cu118-py310-torch222"
 ARG INSTALLER_IMAGE
 ARG VALIDATOR_IMAGE
 
@@ -9,7 +9,7 @@ FROM $VALIDATOR_IMAGE as validator
 
 FROM base
 
-MAINTAINER Ke Wang <wake@microsoft.com>
+LABEL maintainer="Ke Wang <wake@microsoft.com>"
 
 # Set arguments
 ARG TIME_ZONE=Asia/Shanghai
@@ -64,10 +64,6 @@ ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda/lib64:/usr/local/cuda/inclu
     LANGUAGE=en_US:en \
     LC_ALL=en_US.UTF-8 \
     SINGULARITY_IMAGE_ACCELERATOR="NVIDIA"
-
-# Install Horovod
-RUN HOROVOD_GPU_OPERATIONS=NCCL HOROVOD_WITH_PYTORCH=1 pip install --no-cache-dir horovod && \
-    horovodrun --check-build
 
 # Install Apex (https://en.wikipedia.org/wiki/CUDA)
 RUN git clone https://github.com/NVIDIA/apex && \

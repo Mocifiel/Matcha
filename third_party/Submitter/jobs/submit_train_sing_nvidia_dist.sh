@@ -23,7 +23,7 @@ extra_env_setup_cmd="pip install --upgrade pip" # or extra_env_setup_cmd=""
 # ======================= parameters for running script =======================
 # All parameters are optional except "--distributed" which will be parsed by
 # utils/amlt_submit.py. Others will be parsed by your own script.
-dist_method="torch"      # torch or horovod
+dist_method="torch"      # torch
 data_dir="/datablob"     # will download data to /datablob/{alias}/Data/MNIST
                          # or read data from /datablob/{alias}/Data/MNIST
 extra_params="--distributed ${distributed}"
@@ -40,7 +40,7 @@ python -u utils/amlt_submit.py \
   --interconnect-type ${interconnect_type} --distributed ${distributed} \
   --image-registry "azurecr.io" --image-repo "sramdevregistry" \
   --key-vault-name "exawatt-philly-ipgsp" --docker-username "tts-itp-user" \
-  --image-name "pytorch:2.0.1-py39-cuda11.7-ubuntu20.04" \
+  --image-name "submitter:pytorch222-py310-cuda118-ubuntu2004" \
   --data-container-name "philly-ipgsp" --model-container-name "philly-ipgsp" \
   --extra-env-setup-cmd "${extra_env_setup_cmd}" --local-code-dir "$(pwd)" \
   --amlt-project ${project_name} --exp-name ${exp_name} \

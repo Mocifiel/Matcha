@@ -1,0 +1,70 @@
+description: Submit job using Amulet
+
+# specifying vc/cluster/queue
+target:
+  service: amlk8s
+  # name: v100-16gb-scus
+  # vc: speech-itp-tts
+
+# specifying docker information. You will be prompted for the password on submit
+# (can be securely stored on the system, so no need to reenter every time)
+environment:
+  registry: docker.io # docker.io
+  image: wangkenpu/pytorch:1.8.1-py38-cuda11.1-cudnn8-ubuntu18.04
+  setup:
+    # - export
+    # sleeping for 30 seconds to improve ITP stability
+    - sleep 30
+    # install rsync for log sync
+    - sudo apt-get install rsync -y
+    # update pip
+    - pip install --upgrade pip
+    # enabling IB in case it needs to be used
+    - export NCCL_IB_DISABLE=0
+    # - pip install --user --no-deps -e .
+    # we can add any other additional set up here (e.g. exawatt preparation)
+
+code:
+  local_dir: $CONFIG_DIR/..
+
+storage:
+  data_blob:
+    storage_account_name: stdstoragetts01scus
+    container_name: philly-ipgsp
+    mount_dir: /datablob
+    mount_options: ["--file-cache-timeout-in-seconds=10000000"]
+  output:
+    storage_account_name: exawattaiprmbtts01scus
+    container_name: philly-ipgsp
+    is_output: True  # optimizes blob mount for write access
+    mount_dir: /modelblob
+
+jobs:
+  - name: amulet-job
+    sku: G1
+    submit_args:
+      constraints:
+        - tag: connectivityDomain
+          type: uniqueConstraint
+      container_args:
+        shm_size_per_gpu: 5000000000
+        shm_size: 256G
+      env:
+        MKL_THREADING_LAYER: GNU
+    command:
+      - set -ex
+      # copy code
+      - ITP_CODE_DIR="$$AMLT_OUTPUT_DIR/../../../amlt-code/$$AMLT_JOB_NAME"
+      - CREATE_CODE_DIR="mkdir -p $$ITP_CODE_DIR"
+      - COPY_CODE_DIR="cp -r $$AMLT_CODE_DIR/* $$ITP_CODE_DIR"
+      - if [ -z "$$OMPI_COMM_WORLD_RANK" ] || [ "$$OMPI_COMM_WORLD_RANK" = "0" ]; then if [ -d "$$AMLT_CODE_DIR" ]; then echo $$CREATE_CODE_DIR; echo $$COPY_CODE_DIR; $$CREATE_CODE_DIR; $$COPY_CODE_DIR; fi; fi || exit 1;
+      - echo "add your running command here"
+      # copy code directory again to avoid ignoring some files which are created during the runtime
+      - if [ -z "$$OMPI_COMM_WORLD_RANK" ] || [ "$$OMPI_COMM_WORLD_RANK" = "0" ]; then if [ -d "$$AMLT_CODE_DIR" ]; then echo $$CREATE_CODE_DIR; echo $$COPY_CODE_DIR; $$CREATE_CODE_DIR; $$COPY_CODE_DIR; fi; fi || exit 1;
+      # copy ITP log
+      - ITP_LOGS_DIR="$$HOME/tensorboard/$$DLTS_JOB_ID/logs"
+      - CPOY_ITP_LOG="cp -r $$ITP_LOGS_DIR/* $$AMLT_LOGS_DIR"
+      - if [ -z "$$OMPI_COMM_WORLD_RANK" ] || [ "$$OMPI_COMM_WORLD_RANK" = "0" ]; then if [ -d "$$ITP_LOGS_DIR" ] && [ -n "$$ITP_LOGS_DIR" ]; then echo $$CPOY_ITP_LOG; $$CPOY_ITP_LOG; fi; fi || exit 1;
+
+# Note that you can add additional commands to run jobs.
+# In fact, you can modify this file in any way you want to have additional flexibility.

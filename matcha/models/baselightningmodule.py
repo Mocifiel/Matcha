@@ -70,9 +70,12 @@ class BaseLightningClass(LightningModule, ABC):
             cond=cond,
             cond_wav=cond_wav
         )
+        # return {
+        #     "dur_loss": dur_loss,
+        #     "prior_loss": prior_loss,
+        #     "diff_loss": diff_loss,
+        # }
         return {
-            "dur_loss": dur_loss,
-            "prior_loss": prior_loss,
             "diff_loss": diff_loss,
         }
 
@@ -90,22 +93,22 @@ class BaseLightningClass(LightningModule, ABC):
             sync_dist=True,
         )
 
-        self.log(
-            "sub_loss/train_dur_loss",
-            loss_dict["dur_loss"],
-            on_step=True,
-            on_epoch=True,
-            logger=True,
-            sync_dist=True,
-        )
-        self.log(
-            "sub_loss/train_prior_loss",
-            loss_dict["prior_loss"],
-            on_step=True,
-            on_epoch=True,
-            logger=True,
-            sync_dist=True,
-        )
+        # self.log(
+        #     "sub_loss/train_dur_loss",
+        #     loss_dict["dur_loss"],
+        #     on_step=True,
+        #     on_epoch=True,
+        #     logger=True,
+        #     sync_dist=True,
+        # )
+        # self.log(
+        #     "sub_loss/train_prior_loss",
+        #     loss_dict["prior_loss"],
+        #     on_step=True,
+        #     on_epoch=True,
+        #     logger=True,
+        #     sync_dist=True,
+        # )
         self.log(
             "sub_loss/train_diff_loss",
             loss_dict["diff_loss"],
@@ -130,22 +133,22 @@ class BaseLightningClass(LightningModule, ABC):
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss_dict = self.get_losses(batch)
-        self.log(
-            "sub_loss/val_dur_loss",
-            loss_dict["dur_loss"],
-            on_step=True,
-            on_epoch=True,
-            logger=True,
-            sync_dist=True,
-        )
-        self.log(
-            "sub_loss/val_prior_loss",
-            loss_dict["prior_loss"],
-            on_step=True,
-            on_epoch=True,
-            logger=True,
-            sync_dist=True,
-        )
+        # self.log(
+        #     "sub_loss/val_dur_loss",
+        #     loss_dict["dur_loss"],
+        #     on_step=True,
+        #     on_epoch=True,
+        #     logger=True,
+        #     sync_dist=True,
+        # )
+        # self.log(
+        #     "sub_loss/val_prior_loss",
+        #     loss_dict["prior_loss"],
+        #     on_step=True,
+        #     on_epoch=True,
+        #     logger=True,
+        #     sync_dist=True,
+        # )
         self.log(
             "sub_loss/val_diff_loss",
             loss_dict["diff_loss"],

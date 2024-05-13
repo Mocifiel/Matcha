@@ -7,7 +7,7 @@ set -euo pipefail
 registry="singularitybase"
 validator_image_repo="validations/base/singularity-tests"
 installer_image_repo="installer/base/singularity-installer"
-image_name_tag="sramdevregistry.azurecr.io/pytorch:2.0.1-py39-cuda11.7-ubuntu20.04"
+image_name_tag="sramdevregistry.azurecr.io/submitter:pytorch222-py310-cuda118-ubuntu2004"
 
 az acr login -n $registry
 

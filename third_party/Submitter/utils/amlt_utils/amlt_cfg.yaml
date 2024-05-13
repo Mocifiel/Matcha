@@ -18,9 +18,11 @@ environment:
     # install rsync for log sync
     - sudo apt-get install rsync -y
     # update pip
-    - pip install --upgrade pip
+    - python -m pip install --user --upgrade pip
     # enabling IB in case it needs to be used
     - export NCCL_IB_DISABLE=0
+    # Install MLflow
+    - python -m pip install mlflow azureml-mlflow
     # - pip install --user --no-deps -e .
     # we can add any other additional set up here (e.g. exawatt preparation)
 
@@ -31,13 +33,18 @@ storage:
   data_blob:
     storage_account_name: stdstoragetts01scus
     container_name: philly-ipgsp
+    is_output: False  # optimizes blob mount for read access
     mount_dir: /datablob
-    mount_options: ["--file-cache-timeout-in-seconds=10000000"]
   output:
     storage_account_name: exawattaiprmbtts01scus
     container_name: philly-ipgsp
     is_output: True  # optimizes blob mount for write access
     mount_dir: /modelblob
+  # persistent_blob:
+  #   storage_account_name: dataprocessingscus
+  #   container_name: trainingdata
+  #   is_output: False  # optimizes blob mount for read access
+  #   mount_dir: /persistentblob
 
 jobs:
   - name: amulet-job
@@ -51,6 +58,7 @@ jobs:
         shm_size: 256G
       env:
         MKL_THREADING_LAYER: GNU
+      max_run_duration_seconds: 1728000   # 20 days (20 * 3600 * 24)
     command:
       - set -ex
       # copy code

@@ -25,8 +25,10 @@ python -u utils/zetta_submit.py \
   --compute-target "${compute_target}" \
   --experiment-name "${experiment_name}" \
   --display-name "${display_name}" \
+  --data-blob-container "philly-ipgsp" \
+  --model-blob-container "philly-ipgsp" \
   --key-vault-name "exawatt-philly-ipgsp" \
   --docker-address "sramdevregistry.azurecr.io" \
-  --docker-name "pytorch:1.13.0-py38-cuda11.6-cudnn8-ubuntu20.04" \
+  --docker-name "submitter:pytorch222-py310-cuda118-ubuntu2004" \
   --local-code-dir "$(pwd)" \
   --cmd "${command}"
