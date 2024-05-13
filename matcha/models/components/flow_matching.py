@@ -142,3 +142,44 @@ class CFM(BASECFM):
         in_channels = in_channels + (spk_emb_dim if n_spks > 1 else 0)
         # Just change the architecture of the estimator here
         self.estimator = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
+
+class NFDM(BASECFM):
+    def __init__(self, in_channels, out_channel, cfm_params, decoder_params, n_spks=1, spk_emb_dim=64):
+        super().__init__(
+            n_feats=in_channels,
+            cfm_params=cfm_params,
+            n_spks=n_spks,
+            spk_emb_dim=spk_emb_dim,
+        )
+
+        in_channels = in_channels + (spk_emb_dim if n_spks > 1 else 0)
+        # Just change the architecture of the estimator here
+        self.predictor = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params) # x_theta_
+        self.estimator = Decoder(in_channels=in_channels, out_channels=2*out_channel, **decoder_params)
+    
+    
+    def forward(self, mu, mask, n_timesteps, temperature=1.0, spks=None, cond=None, uncond_spks=None,cfk=0):
+        """Forward diffusion
+
+        Args:
+            mu (torch.Tensor): output of encoder
+                shape: (batch_size, n_feats, mel_timesteps)
+            mask (torch.Tensor): output_mask
+                shape: (batch_size, 1, mel_timesteps)
+            n_timesteps (int): number of diffusion steps
+            temperature (float, optional): temperature for scaling noise. Defaults to 1.0.
+            spks (torch.Tensor, optional): speaker ids. Defaults to None.
+                shape: (batch_size, spk_emb_dim)
+            cond: Not used but kept for future purposes
+            uncond_spks (torch.Tensor, optional): unconditional speaker ids. Defauts to None. 
+                Used to implement classifier-free guidance
+                shape: (batch_size, spk_emb_dim)
+            cfk: (float, optional): classifier-free guidance coefficient
+
+        Returns:
+            sample: generated mel-spectrogram
+                shape: (batch_size, n_feats, mel_timesteps)
+        """
+        z = torch.randn_like(mu) * temperature
+        t_span = torch.linspace(0, 1, n_timesteps + 1, device=mu.device)
+        return self.solve_euler(z, t_span=t_span, mu=mu, mask=mask, spks=spks, cond=cond, uncond_spks=uncond_spks, cfk=cfk)
