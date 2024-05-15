@@ -159,9 +159,10 @@ class NFDM(BASECFM):
         in_channels = in_channels + (spk_emb_dim if n_spks > 1 else 0)
         # Just change the architecture of the estimator here
         self.x_predictor = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params) # x_theta_
+        in_channels = 160
         self.mean_predictor = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
-        self.var_predictor = nn.Sequential(Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params),
-                                           nn.Softplus())
+        decoder_params["use_softplus"]=True
+        self.var_predictor = Decoder(in_channels=in_channels, out_channels=out_channel, **decoder_params)
         self.g_phi = nn.Sequential(nn.Linear(1,16),
                                    nn.ReLU(True),
                                    nn.Linear(16,8),
@@ -363,7 +364,33 @@ class NFDM(BASECFM):
     
 
 
-
+if __name__ == "__main__":
+    import yaml
+    from easydict import EasyDict
+    # 读取YAML文件内容
+    with open("/home/chong/Matcha-TTS/configs/model/decoder/default.yaml", "r") as file:
+        decoder_params = yaml.safe_load(file)
+    decoder_params['cross_attention_dim']=None
+    cfm_params  = EasyDict({'name': 'CFM','solver':'euler','sigma_min':1e-4})
+    nfdm = NFDM(in_channels=160,
+              out_channel=80,
+              cfm_params=cfm_params,
+              decoder_params=decoder_params,
+              n_spks=2426,
+              spk_emb_dim=64)
+    # cfm.load_from_ckpt('/data/chong/matcha/models/cfg-mean-80.ckpt')
+    # print(cfm.controlnet.state_dict()['input_control_block.bias'])
+    # print(list(cfm.controlnet.state_dict().keys()))
+    # for key in cfm.estimator.state_dict():
+    #     print(key)
+    print('start')
+    x = torch.randn(4,80,74)
+    mu = torch.randn(4,80,74)
+    mask = torch.ones(4,1,74)
+    t = torch.rand(4,)
+    spks = torch.rand(4,64)
+    
+    nfdm.compute_loss(x,mask,mu,spks)
     
 
 

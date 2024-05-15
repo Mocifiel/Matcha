@@ -215,7 +215,8 @@ class Decoder(nn.Module):
         down_block_type="transformer",
         mid_block_type="transformer",
         up_block_type="transformer",
-        use_cond = False
+        use_cond = False,
+        use_softplus = False
     ):
         super().__init__()
         channels = tuple(channels)
@@ -330,6 +331,10 @@ class Decoder(nn.Module):
 
         self.final_block = Block1D(channels[-1], channels[-1])
         self.final_proj = nn.Conv1d(channels[-1], self.out_channels, 1)
+        
+        self.use_softplus=use_softplus
+        if use_softplus:
+            self.softplus = nn.Softplus()
 
         self.initialize_weights()
         # nn.init.normal_(self.final_proj.weight)
@@ -489,5 +494,7 @@ class Decoder(nn.Module):
 
         x = self.final_block(x, mask_up)
         output = self.final_proj(x * mask_up)
+        if self.use_softplus:
+            output = self.softplus(output)
 
         return output * mask
