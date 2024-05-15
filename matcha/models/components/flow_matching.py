@@ -339,11 +339,13 @@ class NFDM(BASECFM):
         
         g_phi_t = self.g_phi(t)
         log_q_phi = self.log_q_phi(zt,t.squeeze(),x1,mu,mask)
+        print(f'log_q_phi.shape={log_q_phi.shape}')
         
-        score = torch.autograd.grad(outputs=log_q_phi,inputs=zt,create_graph=True) # can be reduced to closed-form later.
+        score = torch.autograd.grad(outputs=log_q_phi.sum(),inputs=zt,create_graph=True) # can be reduced to closed-form later.
+        print(f'score.shape={score[0].shape}')
 
         # compute reverse SDE drift term, which is the training target
-        drift_target = flow - g_phi_t**2/2 *score
+        drift_target = flow - g_phi_t**2/2 *score[0]
 
         # compute the reverse SDE drift term incorporating the prediction of x:
         x_pred = self.x_predictor(zt, mask, mu, t.squeeze(), spks, cond)
@@ -355,9 +357,9 @@ class NFDM(BASECFM):
                                                               torch.zeros_like(mask)))
         
         log_q_phi = self.log_q_phi(zt,t.squeeze(),x_pred,mu,mask)
-        score = torch.autograd.grad(outputs=log_q_phi,inputs=zt,create_graph=True)
+        score = torch.autograd.grad(outputs=log_q_phi.sum(),inputs=zt,create_graph=True)
 
-        drift = flow -g_phi_t**2/2 *score
+        drift = flow -g_phi_t**2/2 *score[0]
         loss = F.mse_loss(drift, drift_target, reduction="sum") / (torch.sum(mask) * drift_target.shape[1])
         return loss, zt
     
