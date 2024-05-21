@@ -133,7 +133,8 @@ class TortoiseDataset(GeneratorBasedBuilder):
         datapipe = datapipe.map(self._process_wav, fn_kwargs = {"conditioning_length": self.conditioning_length})
         datapipe = datapipe.map(self._tokenize, fn_kwargs={"tokenizer": self.tokenizer})
         datapipe = datapipe.filter(self._filter_unk_text)
-        datapipe = datapipe.filter(self._filter_unk_spks)
+        if self._config.get("filter_unk_spks",True):
+            datapipe = datapipe.filter(self._filter_unk_spks)
         datapipe = datapipe.filter(self._filter_long_sentence, fn_kwargs={"max_text_tokens": self._config.get("max_text_tokens", 400),
                                                                           "max_audio_length": self._config.get("max_audio_length", 600 / 22 * 22050)})
         datapipe = datapipe.map(self._rename_and_resize)

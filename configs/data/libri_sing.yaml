@@ -22,6 +22,7 @@ conditioning_length: 360
 max_text_tokens: 400
 max_audio_length: 441000
 n_spks: 2426
+filter_unk_spks: True
 data_statistics:
   mel_mean: 0
   mel_std: 1

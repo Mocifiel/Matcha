@@ -290,6 +290,7 @@ class TextMelTorchTTSDataModule(LightningDataModule):
         max_text_tokens,
         max_audio_length,
         n_spks,
+        filter_unk_spks,
         data_statistics,
     ):
         super().__init__()

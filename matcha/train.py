@@ -57,15 +57,17 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+    for callback in callbacks:
+        print(callback)
 
     log.info("Instantiating loggers...")
     logger: List[Logger] = utils.instantiate_loggers(cfg.get("logger"))
 
-    log.info("Instantiating strategy...")
-    strategy: DDPStrategy = DDPStrategy(timeout=timedelta(seconds=3600),find_unused_parameters=True)
+    # log.info("Instantiating strategy...")
+    # strategy: DDPStrategy = DDPStrategy(timeout=timedelta(seconds=2400),find_unused_parameters=True)
 
     log.info(f"Instantiating trainer <{cfg.trainer._target_}>")  # pylint: disable=protected-access
-    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger,strategy=strategy)
+    trainer: Trainer = hydra.utils.instantiate(cfg.trainer, callbacks=callbacks, logger=logger)#,strategy=strategy)
 
     object_dict = {
         "cfg": cfg,

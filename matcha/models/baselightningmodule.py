@@ -83,7 +83,9 @@ class BaseLightningClass(LightningModule, ABC):
         self.ckpt_loaded_epoch = checkpoint["epoch"]  # pylint: disable=attribute-defined-outside-init
 
     def training_step(self, batch: Any, batch_idx: int):
+        log.info(f'Enter training step of batch_idx {batch_idx}')
         loss_dict = self.get_losses(batch)
+        log.info(f'Got losses for training step of batch_idx {batch_idx}')
         self.log(
             "step",
             float(self.global_step),
@@ -92,6 +94,7 @@ class BaseLightningClass(LightningModule, ABC):
             logger=True,
             sync_dist=True,
         )
+        log.info(f'log step for training step of batch_idx {batch_idx}')
 
         # self.log(
         #     "sub_loss/train_dur_loss",
@@ -117,6 +120,7 @@ class BaseLightningClass(LightningModule, ABC):
             logger=True,
             sync_dist=True,
         )
+        log.info(f'log diff loss for training step of batch_idx {batch_idx}')
 
         total_loss = sum(loss_dict.values())
         self.log(
@@ -128,6 +132,7 @@ class BaseLightningClass(LightningModule, ABC):
             prog_bar=True,
             sync_dist=True,
         )
+        log.info(f'Leave training step of batch_idx {batch_idx}')
 
         return {"loss": total_loss, "log": loss_dict}
 
