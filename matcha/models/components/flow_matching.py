@@ -92,12 +92,12 @@ class BASECFM(torch.nn.Module, ABC):
 
 
             if uncond_spks is not None and cfk>0:
-                dphi_dt_uncond0 = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=torch.zeros_like(cond_wav))
-                controls = self.controlnet(x, mask, mu, t, uncond_spks, cond_wav=torch.zeros_like(cond_wav))
-                dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, control=None)
+                dphi_dt_uncond0 = self.estimator(x, mask, mu, t, uncond_spks, control=None, cond_wav=torch.zeros_like(cond_wav))
+                # controls = self.controlnet(x, mask, mu, t, uncond_spks, cond_wav=torch.zeros_like(cond_wav))
+                # dphi_dt_uncond = self.estimator(x, mask, mu, t, uncond_spks, control=None)
                 
-                dphi_dt_uncond1 = self.estimator(x, mask, mu, t, spks, cond,cond_wav=torch.zeros_like(cond_wav))
-                dphi_dt_uncond2 = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=cond_wav)
+                # dphi_dt_uncond1 = self.estimator(x, mask, mu, t, spks, cond,cond_wav=torch.zeros_like(cond_wav))
+                # dphi_dt_uncond2 = self.estimator(x, mask, mu, t, uncond_spks, cond,cond_wav=cond_wav)
 
                 # dphi_dt = dphi_dt +cfk*(dphi_dt-dphi_dt_uncond0) +cfk*(dphi_dt_uncond1+dphi_dt_uncond2-2*dphi_dt_uncond0)
                 
