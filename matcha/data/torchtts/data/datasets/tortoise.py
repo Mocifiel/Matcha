@@ -127,15 +127,15 @@ class TortoiseDataset(GeneratorBasedBuilder):
         self.conditioning_length = self._config.get("conditioning_length", 360)
         self.load_aligned_codes = self._config.get("load_aligned_codes", False)
         self.aligned_codes_to_audio_ratio = self._config.get("aligned_codes_ratio", 443)
+        
 
         self.tokenizer = VoiceBpeTokenizer(self._config["vocab_path"])
-
-        datapipe = datapipe.map(self._process_wav, fn_kwargs = {"conditioning_length": self.conditioning_length})
+        # datapipe = datapipe.map(self._process_wav, fn_kwargs = {"conditioning_length": self.conditioning_length})
         datapipe = datapipe.map(self._tokenize, fn_kwargs={"tokenizer": self.tokenizer})
         datapipe = datapipe.filter(self._filter_unk_text)
-        datapipe = datapipe.filter(self._filter_unk_spks)
-        datapipe = datapipe.filter(self._filter_long_sentence, fn_kwargs={"max_text_tokens": self._config.get("max_text_tokens", 400),
-                                                                          "max_audio_length": self._config.get("max_audio_length", 600 / 22 * 22050)})
+        # datapipe = datapipe.filter(self._filter_unk_spks)
+        # datapipe = datapipe.filter(self._filter_long_sentence, fn_kwargs={"max_text_tokens": self._config.get("max_text_tokens", 400),
+                                                                        #   "max_audio_length": self._config.get("max_audio_length", 600 / 22 * 22050)})
         datapipe = datapipe.map(self._rename_and_resize)
         datapipe = datapipe.map(self._release_unnecessary_data)
 
@@ -149,68 +149,68 @@ class TortoiseDataset(GeneratorBasedBuilder):
             datapipe = datapipe.map(self._break_replace, fn_kwargs={"break_map": break_map})
 
 
-        datapipe = datapipe.batch(self._config["batch_size"])
+        # datapipe = datapipe.batch(self._config["batch_size"])
 
-        # Shuffle on batch
-        if shuffle:
-            datapipe = datapipe.shuffle(buffer_size=32)
+        # # Shuffle on batch
+        # if shuffle:
+        #     datapipe = datapipe.shuffle(buffer_size=32)
 
-        repeat_epoch = self._config.get("repeat_epoch", -1)
-        if repeat_epoch != -1:
-            datapipe = datapipe.repeat(repeat_epoch)  # this datapipe must be last data pipeline
+        # repeat_epoch = self._config.get("repeat_epoch", -1)
+        # if repeat_epoch != -1:
+        #     datapipe = datapipe.repeat(repeat_epoch)  # this datapipe must be last data pipeline
 
-        # Apply padding and then convert to pytorch tensor
-        datapipe = datapipe.collate(
-            fn_kwargs={
-                "padding_axes": {
-                    "text": -1,
-                    "wav": -1,
-                    "cond": -1,
-                    "cond_wav":-1,
-                    "phone_id":-1,
-                    "y":-1,
-                    "x":-1
-                },
-                "padding_values": {
-                    "text": 0, 
-                    "wav": 0, 
-                    "cond": 0,
-                    "cond_wav":0,
-                    "phone_id":0,
-                    "y":0,
-                    "x":0
-                },
-            }
-        )
-        datapipe = datapipe.map(self._modify_data_after_batch)
+        # # Apply padding and then convert to pytorch tensor
+        # datapipe = datapipe.collate(
+        #     fn_kwargs={
+        #         "padding_axes": {
+        #             # "text": -1,
+        #             # "wav": -1,
+        #             "cond": -1,
+        #             "cond_wav":-1,
+        #             "phone_id":-1,
+        #             "y":-1,
+        #             "x":-1
+        #         },
+        #         "padding_values": {
+        #             # "text": 0, 
+        #             # "wav": 0, 
+        #             "cond": 0,
+        #             "cond_wav":0,
+        #             "phone_id":0,
+        #             "y":0,
+        #             "x":0
+        #         },
+        #     }
+        # )
+        # datapipe = datapipe.map(self._modify_data_after_batch)
         return datapipe
 
     @staticmethod
     def _process_wav(data, conditioning_length):
         audio = data["speech"]
         mel = data["mel"].T
-        data["wav"] = np.expand_dims(audio,axis=0)
-        data["wav_lengths"] = torch.LongTensor([len(audio)])
+        # data["wav"] = np.expand_dims(audio,axis=0)
+        # data["wav_lengths"] = torch.LongTensor([len(audio)])
         #data["conditioning"] = np.expand_dims(audio, axis=0)
         # gap = audio.shape[-1] - conditioning_length
-        gap = mel.shape[-1] - conditioning_length
-        if gap>0:
-            rand_start = random.randint(0, gap)
-            # cond = audio[rand_start:rand_start+conditioning_length]
-            cond = mel[:,rand_start:rand_start+conditioning_length]
-            data["cond"] = cond
-        else:
-            # data["conditioning"] = audio
-            data["cond"] = mel
+        # gap = mel.shape[-1] - conditioning_length
+        # if gap>0:
+        #     rand_start = random.randint(0, gap)
+        #     # cond = audio[rand_start:rand_start+conditioning_length]
+        #     cond = mel[:,rand_start:rand_start+conditioning_length]
+        #     data["cond"] = cond
+        # else:
+        #     # data["conditioning"] = audio
+        #     data["cond"] = mel
 
-        gap = data["wav"].shape[-1] - 88200 # duration is 4s
-        if gap>0:
-            rand_start = random.randint(0,gap)
-            cond_wav = data["wav"][:,rand_start:rand_start+88200]
-        else:
-            cond_wav = data["wav"]
-        cond_wav = librosa.resample(cond_wav, orig_sr=22050, target_sr=16000) # resample to 16khz
-        data["cond_wav"] = cond_wav
+        # gap = data["wav"].shape[-1] - 88200 # duration is 4s
+        # if gap>0:
+        #     rand_start = random.randint(0,gap)
+        #     cond_wav = data["wav"][:,rand_start:rand_start+88200]
+        # else:
+        #     cond_wav = data["wav"]
+        # cond_wav = librosa.resample(cond_wav, orig_sr=22050, target_sr=16000) # resample to 16khz
+        # data["cond_wav"] = cond_wav
         
         # random sampling wav_cond and resample
         
@@ -222,6 +222,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _tokenize(data, tokenizer):
         text = data["text"]
+
         # phone_norm = text_to_sequence(text, ['english_cleaners2'])
         phone_norm = data["phone_id"]
         phone_norm = intersperse(phone_norm, 0)
@@ -234,7 +235,8 @@ class TortoiseDataset(GeneratorBasedBuilder):
         #     logger.warning(f"Found <unk> or <pad> in {text}")
           
         # assert not torch.any(tokens <= 1) # assert no <unk>, start, end token
-        data["text"] = tokens
+        # data["text"] = tokens
+        data["tokens"] = tokens
         data["text_lengths"] = torch.LongTensor([len(tokens)])
         data["x"] = phone_norm
         data["x_lengths"] = phone_norm.shape[-1]
@@ -242,7 +244,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
 
     @staticmethod
     def _filter_unk_text(data):
-        text = data["text"]
+        text = data["tokens"]
         if torch.any(text <= 1):
             return False
         return True
@@ -279,7 +281,7 @@ class TortoiseDataset(GeneratorBasedBuilder):
     @staticmethod
     def _release_unnecessary_data(data):
         # necessary_keys = ["wav", "wav_lengths", "text", "text_lengths", "conditioning","skipped_items", "conditioning_contains_self"]
-        necessary_keys = ["x","x_lengths","y","y_lengths","spks","cond","cond_wav"]
+        necessary_keys = ["text","speech"]
         for key in list(data.keys()):
             if key not in necessary_keys:
                 del data[key]

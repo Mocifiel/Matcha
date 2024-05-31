@@ -9,7 +9,7 @@ from lightning.pytorch.loggers import Logger
 from lightning.pytorch.strategies import DDPStrategy
 from datetime import timedelta
 from omegaconf import DictConfig
-
+import torch
 from matcha import utils
 
 rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True) # commented when running on sing
@@ -33,6 +33,25 @@ rootutils.setup_root(__file__, indicator=".project-root", pythonpath=True) # com
 
 log = utils.get_pylogger(__name__)
 
+class MyPrintingCallback(Callback):
+    def on_before_backward(self,trainer, pl_module, loss):
+        gpu_id = torch.cuda.current_device()
+        print(f"GPU {gpu_id} calling before backward")
+    def on_after_backward(self,trainer, pl_module):
+        gpu_id = torch.cuda.current_device()
+        print(f"GPU {gpu_id} calling after backward")
+    def on_before_optimizer_step(self,trainer, pl_module, optimizer):
+        gpu_id = torch.cuda.current_device()
+        print(f"GPU {gpu_id} calling before optimizer step")
+    def on_exception(self,trainer,pl_module,exception):
+        gpu_id = torch.cuda.current_device()
+        print(f"GPU {gpu_id} calling on exception {exception}")
+    def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
+        gpu_id = torch.cuda.current_device()
+        print(f'GPU {gpu_id} calling on start of batch {batch_idx}')
+    def on_train_batch_end(self,trainer, pl_module, outputs, batch, batch_idx):
+        gpu_id = torch.cuda.current_device()
+        print(f'GPU {gpu_id} calling on end of batch {batch_idx}')
 
 @utils.task_wrapper
 def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
@@ -57,6 +76,8 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
 
     log.info("Instantiating callbacks...")
     callbacks: List[Callback] = utils.instantiate_callbacks(cfg.get("callbacks"))
+    print_callback = MyPrintingCallback()
+    callbacks.append(print_callback)
     for callback in callbacks:
         print(callback)
 

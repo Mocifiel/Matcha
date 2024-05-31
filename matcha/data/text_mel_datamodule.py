@@ -17,6 +17,7 @@ from torchtts.data.core.datapipe_loader import DataPipeLoader
 
 
 import re
+import pandas as pd
 
 
 
@@ -311,6 +312,7 @@ class TextMelTorchTTSDataModule(LightningDataModule):
         self.dataset = dataset.as_data_pipeline()[self.hparams.split]
 
     def train_dataloader(self):
+        print("start2")
         return DataPipeLoader(
             dataset=self.dataset, 
             num_workers=self.hparams.n_workers, 
@@ -357,15 +359,15 @@ if __name__ == '__main__':
     data_torchtts_module = TextMelTorchTTSDataModule(
         name='sydney',
         raw_data='/data/yanzhen/LibriTTS',
-        # data_dir='/data/chong/sydney',
-        data_dir = '/data2/chong/libri',
+        data_dir='/data/chong/sydney',
+        # data_dir = '/data2/chong/libri',
         shard_format='tar',
-        # shard_masks='en-us_EnUSSydney_*.tar',
-        shard_masks='en-us_libriTTSR_*.tar',
+        shard_masks='en-us_EnUSSydney_*.tar',
+        # shard_masks='en-us_libriTTSR_*.tar',
         shard_name='shards',
         split='train',
         shard_size=2000,
-        n_workers=2,
+        n_workers=1,
         pin_memory=True,
         dynamic_batch=False,
         batch_size=16,
@@ -380,6 +382,7 @@ if __name__ == '__main__':
         max_text_tokens=400,
         max_audio_length=441000,
         n_spks=1,
+        filter_unk_spks=False,
         data_statistics={'mel_mean':0.06798957288265228,
                             'mel_std': 1.9658503532409668},
     )
@@ -387,43 +390,25 @@ if __name__ == '__main__':
     phone_min=10000
     phone_max=-10000
     i = 0
-    y_lengths = []
+    texts = []
+    waves = []
+    print("start")
     for data in data_torchtts_module.train_dataloader():
         
-        # print(data['x'][0])
-        # print(data['x_lengths'])
-        # print(data['y_lengths'])
-        print(data.keys())
-        print(f'phone shape = {data["x"].shape}')
-        print(f'mel shape = {data["y"].shape}')
-        print(f'cond shape = {data["cond"].shape}')
-        print(f'cond_wav shape = {data["cond_wav"].shape}')
-        break
-        # print(data['y'].shape)
-        # print(data['spks'])
-        # y_lengths.append(data['y_lengths'])
-        # spks.append(data['spks'])
-    # spks = torch.cat(spks,dim=-1)
-    # print(spks.max())
-    # print(spks.min())
-    # spks = spks.tolist()
-    # sorted_unique_spks = sorted(set(spks))
-    # print(sorted_unique_spks)
+        texts.append(data['text'])
+        waves.append(data['speech'])
+        i+=1
+        if i ==100:
+            break
+    
+
+    df = pd.DataFrame(texts,columns=["Text"])
+    print(df["Text"])
+    df.to_csv('texts.csv')
+
+    for i in range(len(waves)):
+        wav = waves[i]
+        print(wav.shape)
+        ta.save(f'audio_{i}.wav',wav.unsqueeze(0),22050)
 
 
-        # i +=1
-        # if i==2:
-            # break
-    #     for key in data:
-    #         print(f'{key} is {data[key].shape}')
-    #         print(data[key])
-    #         phone_min = min(phone_min, data['x'].min().item())
-    #         phone_max = max(phone_max, data['x'].max().item())
-    #     break
-    # print(f'phone_min = {phone_min}')
-    # print(f'phone_max = {phone_max}')
-
-    # data_loader = data_torchtts_module.train_dataloader()
-    # stats = compute_data_statistics(data_loader,80)
-    # print(f'mean={stats["mel_mean"]},std={stats["mel_std"]}')
-    # print('finish')
